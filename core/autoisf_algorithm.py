@@ -195,14 +195,6 @@ def determine_basal_autoisf(
         if effective_sens == 0:
             effective_sens = prof_sens or 6.0
 
-        # insulin requirement (U)
-        target_bg = getattr(profile, "target_bg", None) or 6.4
-        insulinReq = None
-        try:
-            insulinReq = (eventualBG - target_bg) / effective_sens
-        except Exception:
-            insulinReq = None
-
         # duration: prefer rt.duration, else predBGs length*5, else currenttemp, else default
         duration = 30
         try:
@@ -233,6 +225,30 @@ def determine_basal_autoisf(
         if loop_wanted_smb and loop_wanted_smb != "none":
             duration = max(duration, 60)
 
+        # insulin requirement (U) - compute after duration so rt.rate/ins can be used if present
+        target_bg = getattr(profile, "target_bg", None) or 6.4
+        insulinReq = None
+        try:
+            # prefer explicit insulinReq or rate from rt if present
+            if rt_obj and isinstance(rt_obj, dict):
+                try:
+                    rt_ins = rt_obj.get("insulinReq") or rt_obj.get("insulin_req") or rt_obj.get("insulinReqU")
+                    rt_rate = rt_obj.get("rate") or rt_obj.get("deliveryRate")
+                    if rt_ins is not None:
+                        insulinReq = float(rt_ins)
+                        auto_isf_consoleLog.append(f"Using insulinReq from rt: {insulinReq:.3f} U")
+                    elif rt_rate is not None:
+                        rt_rate = float(rt_rate)
+                        insulinReq = rt_rate * (duration / 60.0)
+                        auto_isf_consoleLog.append(f"Using rate from rt: {rt_rate:.3f} U/h -> insulinReq {insulinReq:.3f} U")
+                except Exception:
+                    pass
+
+            if insulinReq is None:
+                insulinReq = (eventualBG - target_bg) / effective_sens
+        except Exception:
+            insulinReq = None
+
         # compute raw rate (U/h) with safeguards
         rate = 0.0
         try:
@@ -246,12 +262,12 @@ def determine_basal_autoisf(
 
                 # limit abrupt increases relative to current basal (tunable)
                 current_basal = getattr(profile, "current_basal", 0.0) or 0.0
-                max_delta_rate = 2.5  # U/h max allowed increase in one decision (tuneable)
+                max_delta_rate = 3.0  # U/h max allowed increase in one decision (tuneable)
                 allowed_max = current_basal + max_delta_rate
                 raw_rate = min(raw_rate, allowed_max)
 
                 # SMB scaling: apply only for very small insulinReq to avoid underdelivery
-                smb_threshold = 0.5  # U threshold below which SMB scaling is applied
+                smb_threshold = 1.0  # U threshold below which SMB scaling is applied
                 if abs(insulinReq) < smb_threshold and getattr(profile, "enableSMB_always", False):
                     smb_ratio_local = getattr(profile, "smb_delivery_ratio", smb_ratio or 0.5)
                     raw_rate = raw_rate * float(smb_ratio_local)
