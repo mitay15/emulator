@@ -14,6 +14,7 @@ This file provides a defensive implementation of determine_basal_autoisf that:
 
 from dataclasses import dataclass
 from typing import Optional, Any
+import re
 
 
 @dataclass
@@ -31,7 +32,7 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> Optional[float]:
 
     Handles:
       - dict with keys 'eventualBG', 'eventual_bg', 'predBGs', 'predictions'
-      - string logs containing 'eventualBG=NNN'
+      - string logs containing 'eventualBG=NNN' or 'Eventual BG N,N' patterns
 
     If value looks like mg/dL (>30), convert to mmol/L by dividing by 18.
     """
@@ -62,23 +63,32 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> Optional[float]:
 
         return None
 
-    # string-like rt (parse eventualBG=NNN)
+    # string-like rt (parse eventualBG=NNN or "Eventual BG 14,2")
     try:
         s = str(rt_obj)
+        # try key=value first
         marker = "eventualBG="
         if marker in s:
             part = s.split(marker, 1)[1]
             num = ""
             for ch in part:
-                if (ch.isdigit() or ch in ".-"):
+                if (ch.isdigit() or ch in ".-,"):
                     num += ch
                 else:
                     break
             if num:
-                val = float(num)
+                val = float(num.replace(",", "."))
                 if val > 30:
                     return val / 18.0
                 return val
+
+        # try "Eventual BG 14,2" or "EventualBG is 14.2"
+        m = re.search(r'eventual\s*bg\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)', s, flags=re.IGNORECASE)
+        if m:
+            val = float(m.group(1).replace(",", "."))
+            if val > 30:
+                return val / 18.0
+            return val
     except Exception:
         pass
 
@@ -139,6 +149,7 @@ def determine_basal_autoisf(
         # 1) Try to get predicted eventualBG from rt/predictions if available
         eventualBG = None
         rt_obj = rt
+
         if rt_obj:
             ev_from_rt = _extract_predicted_eventual_from_rt(rt_obj)
             if ev_from_rt is not None:
@@ -224,7 +235,9 @@ def determine_basal_autoisf(
             duration = max(duration, 60)
 
         # --- RT pre-checks: support rt as dict or as string; prioritize explicit rt.insulinReq/rate and respect disable signals ---
-        import re
+        # flag: if RT explicitly disabled basal (low temp) we will force final rate=0.0
+        rt_disable_basal = False
+
         try:
             # normalize rt_obj to a dict-like view: if it's a string, parse key=value tokens
             parsed_rt = {}
@@ -272,6 +285,20 @@ def determine_basal_autoisf(
                 except Exception:
                     pass
 
+                # If RT provided a duration explicitly, prefer it for insulinReq->rate conversion
+                try:
+                    if isinstance(parsed_rt, dict):
+                        rt_dur_val = parsed_rt.get("duration") or parsed_rt.get("dur")
+                        if rt_dur_val is not None:
+                            # normalize seconds->minutes if needed
+                            rt_dur_int = int(float(rt_dur_val))
+                            if rt_dur_int > 300:
+                                rt_dur_int = max(5, rt_dur_int // 60)
+                            # prefer RT duration for conversion
+                            duration = max(5, rt_dur_int)
+                            auto_isf_consoleLog.append(f"Using explicit rt.duration for conversion: {duration} minutes")
+                except Exception:
+                    pass
 
                 # Detect explicit disable/zeroTemp signals from dict fields or parsed text
                 try:
@@ -296,21 +323,84 @@ def determine_basal_autoisf(
                     except Exception:
                         min_guard = None
 
-                    # keyword patterns that indicate SMB disabled / zero temp / projected below safe guard
+                    # patterns that indicate SMB disabled / zero temp / projected below safe guard
                     if ("disabling smb" in txt) or ("disable smb" in txt) or ("min guard" in txt) \
-                       or ("projected below" in txt) or ("minguardbg" in txt) or ("minGuardBG" in txt) \
+                       or ("projected below" in txt) or ("minguardbg" in txt) or ("minguardbg" in txt) \
                        or (isinstance(ztd, (int, float)) and float(ztd) > 0) \
                        or (isinstance(zte, (int, float)) and abs(float(zte)) > 0) \
                        or (min_guard is not None and min_guard < 3.6):
                         auto_isf_consoleLog.append("RT indicates SMB/insulin delivery disabled — forcing insulinReq=0 and rate=0")
-                        insulinReq = 0.0
-                        rate = 0.0
+                        # Historically we forced insulinReq=0 here; prefer preserving insulinReq but mark disable.
+                        rt_disable_basal = True
+                except Exception:
+                    pass
+
+                # Extended detection: additional fields and numeric minGuardBG parsing
+                try:
+                    txt2 = " ".join([
+                        str(parsed_rt.get("reason") or ""),
+                        str(parsed_rt.get("consoleLog") or ""),
+                        str(parsed_rt.get("consoleError") or ""),
+                        str(parsed_rt.get("notes") or ""),
+                        str(parsed_rt.get("message") or "")
+                    ]).lower()
+
+                    ztd2 = parsed_rt.get("zeroTempDuration") or parsed_rt.get("zero_temp_duration") or 0
+                    zte2 = parsed_rt.get("zeroTempEffect") or parsed_rt.get("zero_temp_effect") or 0
+                    min_guard2 = None
+                    try:
+                        mg2 = parsed_rt.get("minGuardBG") or parsed_rt.get("min_guard_bg") or parsed_rt.get("minGuard")
+                        if mg2 is not None:
+                            min_guard2 = float(str(mg2).replace(",", "."))
+                    except Exception:
+                        min_guard2 = None
+
+                    if ("disabling smb" in txt2) or ("disable smb" in txt2) or ("min guard" in txt2) \
+                       or ("projected below" in txt2) or ("minguardbg" in txt2) \
+                       or (isinstance(ztd2, (int, float)) and float(ztd2) > 0) \
+                       or (isinstance(zte2, (int, float)) and abs(float(zte2)) > 0) \
+                       or (min_guard2 is not None and min_guard2 < 3.6):
+                        auto_isf_consoleLog.append("RT extended check: SMB disabled or zeroTemp indicated — will force final basal disable")
+                        rt_disable_basal = True
+                except Exception:
+                    pass
+
+                # Additional detection for low temp / microbolus / units
+                try:
+                    # raw text from parsed_rt (if parsed from string) or combined fields
+                    txt_for_lowtemp = ""
+                    if isinstance(parsed_rt, dict) and parsed_rt.get("_raw_text"):
+                        txt_for_lowtemp = parsed_rt.get("_raw_text")
+                    else:
+                        txt_for_lowtemp = " ".join([
+                            str(parsed_rt.get("reason") or ""),
+                            str(parsed_rt.get("consoleLog") or ""),
+                            str(parsed_rt.get("consoleError") or ""),
+                            str(parsed_rt.get("message") or ""),
+                            str(parsed_rt.get("notes") or "")
+                        ]).lower()
+
+                    # numeric indicators
+                    rt_units = parsed_rt.get("units") if isinstance(parsed_rt, dict) else None
+                    rt_rate_field = parsed_rt.get("rate") if isinstance(parsed_rt, dict) else None
+                    rt_duration_field = parsed_rt.get("duration") or parsed_rt.get("dur") if isinstance(parsed_rt, dict) else None
+
+                    # patterns that indicate AAPS set a low temp 0.0U/h or used microbolus
+                    lowtemp_phrase = ("setting" in txt_for_lowtemp and "low temp" in txt_for_lowtemp and "0.0" in txt_for_lowtemp) \
+                                     or ("low temp of 0.0" in txt_for_lowtemp) \
+                                     or ("low temp of 0.0u/h" in txt_for_lowtemp) \
+                                     or ("microbolus" in txt_for_lowtemp) \
+                                     or (rt_rate_field is not None and float(rt_rate_field) == 0.0 and rt_duration_field is not None)
+
+                    if lowtemp_phrase or (rt_units is not None and float(rt_units) > 0):
+                        auto_isf_consoleLog.append("RT indicates low temp 0.0U/h or microbolus — will force final basal rate=0.0 (microbolus/insulinReq preserved)")
+                        # Mark that RT disabled basal; do not overwrite insulinReq here.
+                        rt_disable_basal = True
                 except Exception:
                     pass
         except Exception:
             pass
         # --- end RT pre-checks ---
-
 
         # insulin requirement (U) - compute after duration so rt.rate/ins can be used if present
         target_bg = getattr(profile, "target_bg", None) or 6.4
@@ -337,7 +427,19 @@ def determine_basal_autoisf(
 
                 # limit abrupt increases relative to current basal (tunable)
                 current_basal = getattr(profile, "current_basal", 0.0) or 0.0
-                max_delta_rate = 3.0  # U/h max allowed increase in one decision (tuneable)
+
+                # Tighter delta to better match reference behavior.
+                # Reduce abrupt increases; tuneable: 2.4 is a good compromise.
+                # If profile provides a custom max_delta_rate, prefer it.
+                try:
+                    profile_max_delta = getattr(profile, "max_delta_rate", None)
+                    if profile_max_delta is not None:
+                        max_delta_rate = float(profile_max_delta)
+                    else:
+                        max_delta_rate = 2.4
+                except Exception:
+                    max_delta_rate = 2.4
+
                 allowed_max = current_basal + max_delta_rate
                 raw_rate = min(raw_rate, allowed_max)
 
@@ -358,9 +460,10 @@ def determine_basal_autoisf(
                 except Exception:
                     pass
 
-                # If RT explicitly set insulinReq to 0 (or we forced it due to disabling SMB), ensure raw_rate is zero
+                # If RT explicitly set insulinReq to 0 earlier we preserved it as flag; do not zero here.
                 try:
-                    if 'insulinReq' in locals() and insulinReq == 0.0:
+                    if 'insulinReq' in locals() and insulinReq == 0.0 and not rt_disable_basal:
+                        # If insulinReq is explicitly zero and RT did not mark disable, ensure raw_rate is zero.
                         raw_rate = 0.0
                         auto_isf_consoleLog.append("insulinReq==0.0 (RT or pre-check) — forcing raw_rate=0.0")
                 except Exception:
@@ -378,9 +481,41 @@ def determine_basal_autoisf(
 
                 auto_isf_consoleLog.append(f"Final rate decision (pre-clamp): raw_rate={raw_rate:.3f} source={final_rate_source}")
 
-                rate = max(0.0, raw_rate)
+                # --- Align rounding and final clamps with AAPS reference ---
+                try:
+                    # insulinReq: keep 3 decimal places (U)
+                    if insulinReq is not None:
+                        insulinReq = round(float(insulinReq), 3)
+
+                    # raw_rate: round to 3 decimals for intermediate, then apply final clamps,
+                    # then round final rate to 2 decimals (pump-like resolution)
+                    raw_rate = round(float(raw_rate), 3)
+
+                    # Re-apply profile caps after rounding intermediate value
+                    if max_basal is not None:
+                        raw_rate = min(raw_rate, float(max_basal))
+
+                    # Re-apply allowed_max (delta limit) after rounding
+                    raw_rate = min(raw_rate, allowed_max)
+
+                    # Ensure non-negative
+                    final_rate = max(0.0, raw_rate)
+
+                    # Final rounding to 2 decimals (pump-like resolution)
+                    rate = round(final_rate, 2)
+                    auto_isf_consoleLog.append(f"Final rate after rounding/clamps: rate={rate:.2f} U/h (raw={raw_rate:.3f})")
+                except Exception:
+                    rate = max(0.0, raw_rate)
         except Exception:
             rate = 0.0
+
+        # If RT explicitly disabled basal earlier, enforce final rate=0.0 now (do not change insulinReq)
+        try:
+            if 'rt_disable_basal' in locals() and rt_disable_basal:
+                auto_isf_consoleLog.append("Enforcing RT disable: overriding final rate -> 0.0 U/h (insulinReq preserved)")
+                rate = 0.0
+        except Exception:
+            pass
 
         # fill result
         res.eventualBG = eventualBG
