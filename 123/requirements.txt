@@ -1,4 +1,0 @@
-matplotlib>=3.7
-PyQt6
-numpy
-pytest
