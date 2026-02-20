@@ -234,6 +234,17 @@ def determine_basal_autoisf(
         if loop_wanted_smb and loop_wanted_smb != "none":
             duration = max(duration, 60)
 
+        # RT parsing and priority rules:
+        # - Accept rt as dict or raw string; parse key=value tokens and extract textual hints.
+        # - Recognized fields: eventualBG, insulinReq, rate, duration, units, zeroTempDuration, minGuardBG.
+        # - Priority order for deciding final rate:
+        #     1) explicit RT rate (parsed from dict or extracted from RT text)
+        #     2) explicit RT insulinReq (converted to rate using RT duration)
+        #     3) computed insulinReq from eventualBG -> rate
+        # - If RT indicates low temp / microbolus (rt_disable_basal), final basal rate is forced to 0.0,
+        #   but RT insulinReq is preserved for microbolus handling.
+        # - Rounding/clamp order: round intermediate raw_rate to 3 decimals, reapply profile caps,
+        #   then final round to 2 decimals (pump-like resolution).
         # --- RT pre-checks: support rt as dict or as string; prioritize explicit rt.insulinReq/rate and respect disable signals ---
         # flag: if RT explicitly disabled basal (low temp) we will force final rate=0.0
         rt_disable_basal = False
