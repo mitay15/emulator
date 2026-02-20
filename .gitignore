@@ -40,6 +40,8 @@ logs_extracted/
 # Project-specific generated files
 # -------------------------
 *.csv
+!tests/reference_generated.csv
+
 *.png
 *.jpg
 *.jpeg
