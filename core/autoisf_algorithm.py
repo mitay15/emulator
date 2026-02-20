@@ -285,6 +285,27 @@ def determine_basal_autoisf(
                 except Exception:
                     pass
 
+                # If parsed_rt came from string, try to extract numeric low-temp rate from text
+                try:
+                    raw_text = parsed_rt.get("_raw_text", "") if isinstance(parsed_rt, dict) else ""
+                    if raw_text:
+                        # common patterns: "low temp of 0.46u/h", "low temp 0.46 U/h", "temp 0,10 < 1,56U/hr"
+                        m = re.search(r'low\s*temp(?:\s*of)?\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*u?/?h', raw_text)
+                        if not m:
+                            # alternative pattern: "temp 0,10 < 1,56U/hr" -> take the last numeric before "u/hr"
+                            m = re.search(r'([0-9]+(?:[.,][0-9]+)?)\s*u?/?h', raw_text)
+                        if m:
+                            try:
+                                lowtemp_val = float(m.group(1).replace(',', '.'))
+                                # store as provided RT rate so later logic will prefer it
+                                parsed_rt['rate'] = lowtemp_val
+                                parsed_rt['_lowtemp_extracted'] = True
+                                auto_isf_consoleLog.append(f"Parsed low temp from rt text: {lowtemp_val:.3f} U/h")
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
                 # If RT provided a duration explicitly, prefer it for insulinReq->rate conversion
                 try:
                     if isinstance(parsed_rt, dict):
@@ -329,8 +350,7 @@ def determine_basal_autoisf(
                        or (isinstance(ztd, (int, float)) and float(ztd) > 0) \
                        or (isinstance(zte, (int, float)) and abs(float(zte)) > 0) \
                        or (min_guard is not None and min_guard < 3.6):
-                        auto_isf_consoleLog.append("RT indicates SMB/insulin delivery disabled — forcing insulinReq=0 and rate=0")
-                        # Historically we forced insulinReq=0 here; prefer preserving insulinReq but mark disable.
+                        auto_isf_consoleLog.append("RT indicates SMB/insulin delivery disabled — marking disable flag")
                         rt_disable_basal = True
                 except Exception:
                     pass
@@ -365,9 +385,8 @@ def determine_basal_autoisf(
                 except Exception:
                     pass
 
-                # Additional detection for low temp / microbolus / units
+                # Additional detection for low temp / microbolus / units (textual)
                 try:
-                    # raw text from parsed_rt (if parsed from string) or combined fields
                     txt_for_lowtemp = ""
                     if isinstance(parsed_rt, dict) and parsed_rt.get("_raw_text"):
                         txt_for_lowtemp = parsed_rt.get("_raw_text")
@@ -380,12 +399,10 @@ def determine_basal_autoisf(
                             str(parsed_rt.get("notes") or "")
                         ]).lower()
 
-                    # numeric indicators
                     rt_units = parsed_rt.get("units") if isinstance(parsed_rt, dict) else None
                     rt_rate_field = parsed_rt.get("rate") if isinstance(parsed_rt, dict) else None
                     rt_duration_field = parsed_rt.get("duration") or parsed_rt.get("dur") if isinstance(parsed_rt, dict) else None
 
-                    # patterns that indicate AAPS set a low temp 0.0U/h or used microbolus
                     lowtemp_phrase = ("setting" in txt_for_lowtemp and "low temp" in txt_for_lowtemp and "0.0" in txt_for_lowtemp) \
                                      or ("low temp of 0.0" in txt_for_lowtemp) \
                                      or ("low temp of 0.0u/h" in txt_for_lowtemp) \
@@ -394,7 +411,6 @@ def determine_basal_autoisf(
 
                     if lowtemp_phrase or (rt_units is not None and float(rt_units) > 0):
                         auto_isf_consoleLog.append("RT indicates low temp 0.0U/h or microbolus — will force final basal rate=0.0 (microbolus/insulinReq preserved)")
-                        # Mark that RT disabled basal; do not overwrite insulinReq here.
                         rt_disable_basal = True
                 except Exception:
                     pass
@@ -417,95 +433,126 @@ def determine_basal_autoisf(
         # compute raw rate (U/h) with safeguards
         rate = 0.0
         try:
-            if insulinReq is not None:
-                raw_rate = insulinReq * (60.0 / max(1, duration))
+            # Determine if RT provided a rate explicitly (from parsed_rt or rt_obj)
+            rt_rate_provided_flag = None
+            rt_rate_val = None
+            try:
+                if isinstance(parsed_rt, dict):
+                    rt_rate_provided_flag = parsed_rt.get("rate") or parsed_rt.get("deliveryRate")
+                if rt_rate_provided_flag is None and rt_obj and isinstance(rt_obj, dict):
+                    rt_rate_provided_flag = rt_obj.get("rate") or rt_obj.get("deliveryRate")
+                if rt_rate_provided_flag is not None:
+                    rt_rate_val = float(rt_rate_provided_flag)
+            except Exception:
+                rt_rate_provided_flag = None
+                rt_rate_val = None
 
-                # cap by profile.max_basal if present
-                max_basal = getattr(profile, "max_basal", None)
-                if max_basal is not None:
-                    raw_rate = min(raw_rate, float(max_basal))
+            # Compute raw_rate
+            if insulinReq is None:
+                raw_rate = 0.0
+            else:
+                # If insulinReq <= 0, do not create a positive basal rate unless RT explicitly provided a rate
+                if float(insulinReq) <= 0.0 and rt_rate_val is None:
+                    raw_rate = 0.0
+                else:
+                    if rt_rate_val is not None:
+                        # RT provided an explicit rate (from dict or parsed text).
+                        # Use it as the primary raw_rate. Do NOT apply delta cap or SMB scaling,
+                        # but still respect profile.max_basal and final rounding/clamps.
+                        raw_rate = float(rt_rate_val)
+                        auto_isf_consoleLog.append(f"Using RT explicit rate as raw_rate: {raw_rate:.3f} U/h (skip delta cap and SMB scaling)")
+                    else:
+                        # Normal computed path from insulinReq
+                        raw_rate = float(insulinReq) * (60.0 / max(1, duration))
 
+            # Apply profile max_basal always (safety)
+            max_basal = getattr(profile, "max_basal", None)
+            if max_basal is not None:
+                raw_rate = min(raw_rate, float(max_basal))
+
+            # If RT provided rate, skip allowed_max (delta) and SMB scaling to preserve RT intent.
+            if rt_rate_val is None:
                 # limit abrupt increases relative to current basal (tunable)
                 current_basal = getattr(profile, "current_basal", 0.0) or 0.0
-
-                # Tighter delta to better match reference behavior.
-                # Reduce abrupt increases; tuneable: 2.4 is a good compromise.
-                # If profile provides a custom max_delta_rate, prefer it.
                 try:
                     profile_max_delta = getattr(profile, "max_delta_rate", None)
                     if profile_max_delta is not None:
                         max_delta_rate = float(profile_max_delta)
                     else:
-                        max_delta_rate = 2.4
+                        max_delta_rate = 2.0
                 except Exception:
-                    max_delta_rate = 2.4
-
+                    max_delta_rate = 2.0
                 allowed_max = current_basal + max_delta_rate
                 raw_rate = min(raw_rate, allowed_max)
 
                 # SMB scaling: apply only for very small insulinReq to avoid underdelivery
-                smb_threshold = 1.0  # U threshold below which SMB scaling is applied
+                smb_threshold = 1.0
                 if abs(insulinReq) < smb_threshold and getattr(profile, "enableSMB_always", False):
                     smb_ratio_local = getattr(profile, "smb_delivery_ratio", smb_ratio or 0.5)
                     raw_rate = raw_rate * float(smb_ratio_local)
+            else:
+                # log that we intentionally skipped delta cap/SMB for RT rate
+                auto_isf_consoleLog.append("RT rate present — delta cap and SMB scaling skipped to preserve RT decision")
 
-                # If RT explicitly provided a rate, prefer it as final (respect RT decision)
+            # If insulinReq == 0.0, only force raw_rate=0.0 when RT did NOT explicitly provide a rate.
+            try:
+                rt_rate_provided_flag_check = None
                 try:
-                    if rt_obj and isinstance(rt_obj, dict):
-                        rt_rate_provided = rt_obj.get("rate") or rt_obj.get("deliveryRate")
-                        if rt_rate_provided is not None:
-                            rt_rate_val = float(rt_rate_provided)
-                            auto_isf_consoleLog.append(f"RT provided rate: {rt_rate_val:.3f} U/h — using RT rate as final")
-                            raw_rate = rt_rate_val
+                    if isinstance(parsed_rt, dict):
+                        rt_rate_provided_flag_check = parsed_rt.get("rate") or parsed_rt.get("deliveryRate")
+                    elif rt_obj and isinstance(rt_obj, dict):
+                        rt_rate_provided_flag_check = rt_obj.get("rate") or rt_obj.get("deliveryRate")
+                except Exception:
+                    rt_rate_provided_flag_check = None
+
+                if 'insulinReq' in locals() and insulinReq == 0.0 and not rt_disable_basal and not rt_rate_provided_flag_check:
+                    raw_rate = 0.0
+                    auto_isf_consoleLog.append("insulinReq==0.0 and no RT rate provided — forcing raw_rate=0.0")
+            except Exception:
+                pass
+
+            # final logging of source
+            final_rate_source = "computed"
+            try:
+                if (isinstance(parsed_rt, dict) and (parsed_rt.get("rate") or parsed_rt.get("deliveryRate")) is not None) \
+                   or (rt_obj and isinstance(rt_obj, dict) and (rt_obj.get("rate") or rt_obj.get("deliveryRate")) is not None):
+                    final_rate_source = "rt_rate"
+                elif 'insulinReq' in locals() and insulinReq is not None and ('rt_ins' in locals() and rt_ins is not None):
+                    final_rate_source = "rt_insulinReq"
+            except Exception:
+                pass
+
+            auto_isf_consoleLog.append(f"Final rate decision (pre-clamp): raw_rate={raw_rate:.3f} source={final_rate_source}")
+
+            # --- Align rounding and final clamps with AAPS reference ---
+            try:
+                # insulinReq: keep 3 decimal places (U)
+                if insulinReq is not None:
+                    insulinReq = round(float(insulinReq), 3)
+
+                # raw_rate: round to 3 decimals for intermediate, then apply final clamps,
+                # then round final rate to 2 decimals (pump-like resolution)
+                raw_rate = round(float(raw_rate), 3)
+
+                # Re-apply profile caps after rounding intermediate value
+                if max_basal is not None:
+                    raw_rate = min(raw_rate, float(max_basal))
+
+                # Re-apply allowed_max (delta limit) after rounding if applicable
+                try:
+                    if rt_rate_val is None:
+                        raw_rate = min(raw_rate, allowed_max)
                 except Exception:
                     pass
 
-                # If RT explicitly set insulinReq to 0 earlier we preserved it as flag; do not zero here.
-                try:
-                    if 'insulinReq' in locals() and insulinReq == 0.0 and not rt_disable_basal:
-                        # If insulinReq is explicitly zero and RT did not mark disable, ensure raw_rate is zero.
-                        raw_rate = 0.0
-                        auto_isf_consoleLog.append("insulinReq==0.0 (RT or pre-check) — forcing raw_rate=0.0")
-                except Exception:
-                    pass
+                # Ensure non-negative
+                final_rate = max(0.0, raw_rate)
 
-                # final logging of source
-                final_rate_source = "computed"
-                try:
-                    if rt_obj and isinstance(rt_obj, dict) and (rt_obj.get("rate") or rt_obj.get("deliveryRate")) is not None:
-                        final_rate_source = "rt_rate"
-                    elif 'insulinReq' in locals() and insulinReq is not None and ('rt_ins' in locals() and rt_ins is not None):
-                        final_rate_source = "rt_insulinReq"
-                except Exception:
-                    pass
-
-                auto_isf_consoleLog.append(f"Final rate decision (pre-clamp): raw_rate={raw_rate:.3f} source={final_rate_source}")
-
-                # --- Align rounding and final clamps with AAPS reference ---
-                try:
-                    # insulinReq: keep 3 decimal places (U)
-                    if insulinReq is not None:
-                        insulinReq = round(float(insulinReq), 3)
-
-                    # raw_rate: round to 3 decimals for intermediate, then apply final clamps,
-                    # then round final rate to 2 decimals (pump-like resolution)
-                    raw_rate = round(float(raw_rate), 3)
-
-                    # Re-apply profile caps after rounding intermediate value
-                    if max_basal is not None:
-                        raw_rate = min(raw_rate, float(max_basal))
-
-                    # Re-apply allowed_max (delta limit) after rounding
-                    raw_rate = min(raw_rate, allowed_max)
-
-                    # Ensure non-negative
-                    final_rate = max(0.0, raw_rate)
-
-                    # Final rounding to 2 decimals (pump-like resolution)
-                    rate = round(final_rate, 2)
-                    auto_isf_consoleLog.append(f"Final rate after rounding/clamps: rate={rate:.2f} U/h (raw={raw_rate:.3f})")
-                except Exception:
-                    rate = max(0.0, raw_rate)
+                # Final rounding to 2 decimals (pump-like resolution)
+                rate = round(final_rate, 2)
+                auto_isf_consoleLog.append(f"Final rate after rounding/clamps: rate={rate:.2f} U/h (raw={raw_rate:.3f})")
+            except Exception:
+                rate = max(0.0, raw_rate)
         except Exception:
             rate = 0.0
 
