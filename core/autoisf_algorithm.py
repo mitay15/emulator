@@ -262,7 +262,6 @@ def determine_basal_autoisf(
             auto_isf_consoleLog.append("RT indicates SMB disabled / zero-temp → forcing basal=0 later")
         # --- end RT pre-checks ---
 
-
         # insulin requirement (U) - compute after duration so rt.rate/ins can be used if present
         target_bg = getattr(profile, "target_bg", None) or 6.4
         # Do not reset insulinReq if RT pre-checks already set it.
