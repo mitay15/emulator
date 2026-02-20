@@ -1,0 +1,75 @@
+# -------------------------
+# Python cache / build
+# -------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.dll
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# -------------------------
+# Logs, dumps, temp files
+# -------------------------
+*.log
+*.zip
+*.tmp
+*.bak
+*.old
+*.swp
+*.swo
+
+# AndroidAPS logs
+logs/
+logs_extracted/
+*.log.zip
+
+# -------------------------
+# Project-specific generated files
+# -------------------------
+*.csv
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+# Auto-generated reference files
+aaps_emulator/tests/diffs_with_inputs.csv
+tests/reference.csv
+
+# -------------------------
+# IDE / Editor settings
+# -------------------------
+# PyCharm
+.idea/
+*.iml
+
+# VSCode
+.vscode/
+
+# -------------------------
+# OS files
+# -------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# -------------------------
+# Python profiling / debug
+# -------------------------
+*.prof
+*.profile
+*.coverage
+.cache/
