@@ -1,0 +1,19 @@
+[project]
+name = "aaps_emulator"
+version = "0.1.0"
+description = "AAPS algorithm emulator"
+authors = [
+    { name = "Dimas" }
+]
+requires-python = ">=3.10"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["aaps_emulator"]
+
+[tool.setuptools.package-dir]
+aaps_emulator = "."
