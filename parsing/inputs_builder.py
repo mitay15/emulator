@@ -1,9 +1,9 @@
-from parsing.context_parsers import (
+from aaps_emulator.parsing.context_parsers import (
     parse_glucose_status, parse_current_temp, parse_iob_history,
     parse_profile, parse_autosens, parse_meal
 )
-from parsing.rt_parser import parse_rt
-from core.autoisf_structs import OapsProfileAutoIsf
+from aaps_emulator.parsing.rt_parser import parse_rt
+from aaps_emulator.core.autoisf_structs import OapsProfileAutoIsf
 
 
 def build_inputs(block):

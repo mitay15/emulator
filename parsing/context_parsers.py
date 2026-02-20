@@ -1,9 +1,9 @@
 import re
-from core.autoisf_structs import (
+from aaps_emulator.core.autoisf_structs import (
     GlucoseStatus, IobTotal, MealData, AutosensResult,
     CurrentTemp, OapsProfileAutoIsf
 )
-from parsing.utils import clean_num
+from aaps_emulator.parsing.utils import clean_num
 
 
 def parse_glucose_status(context):

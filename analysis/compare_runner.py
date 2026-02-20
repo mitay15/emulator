@@ -1,9 +1,14 @@
 # aaps_emulator/analysis/compare_runner.py
 import os
 import re
-from parsing.log_loader import find_all_zip_logs, extract_zip, load_log_blocks
-from parsing.inputs_builder import build_inputs
-from core.autoisf_algorithm import determine_basal_autoisf
+from aaps_emulator.parsing.log_loader import (
+    find_all_zip_logs,
+    extract_zip,
+    load_log_blocks,
+)
+
+from aaps_emulator.parsing.inputs_builder import build_inputs
+from aaps_emulator.core.autoisf_algorithm import determine_basal_autoisf
 
 
 def run_compare_on_all_logs(logs_dir="logs"):

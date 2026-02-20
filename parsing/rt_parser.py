@@ -1,5 +1,5 @@
 import re
-from parsing.utils import clean_num
+from aaps_emulator.parsing.utils import clean_num
 
 def parse_rt(rt_line):
     def get(name):

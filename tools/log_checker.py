@@ -1,7 +1,7 @@
 import os
 import math
 import csv
-from analysis.compare_runner import run_compare_on_all_logs
+from aaps_emulator.analysis.compare_runner import run_compare_on_all_logs
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
