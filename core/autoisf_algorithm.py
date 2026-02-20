@@ -8,14 +8,12 @@ This file provides a defensive implementation of determine_basal_autoisf that:
  - uses autosens ratio and sensitivityRatio from rt when present
  - converts mg/dL -> mmol/L when appropriate (threshold-based)
  - computes insulinReq and maps it to rate with safeguards (duration, SMB scaling, caps)
+ - prioritizes explicit RT-provided insulinReq/rate and respects RT signals that disable SMB
  - returns AutoIsfResult(eventualBG, insulinReq, rate, duration)
 """
 
 from dataclasses import dataclass
 from typing import Optional, Any
-
-# If your project has compute_autosens_ratio in core.autosens, keep this import.
-# from core.autosens import compute_autosens_ratio
 
 
 @dataclass
@@ -46,7 +44,6 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> Optional[float]:
         if ev is not None:
             try:
                 evf = float(ev)
-                # threshold lowered to 30 to catch values like 39 mg/dL
                 if evf > 30:
                     return evf / 18.0
                 return evf
@@ -114,6 +111,7 @@ def determine_basal_autoisf(
     - Uses rt predictions when available (rt may be dict or string).
     - Falls back to bg + delta*30 projection when no predictions.
     - Uses autosens_data.ratio or sensitivityRatio from rt when present.
+    - Prioritizes RT-provided insulinReq/rate and respects RT disable signals.
     - Returns AutoIsfResult(eventualBG, insulinReq, rate, duration).
     """
     if auto_isf_consoleError is None:
@@ -225,26 +223,103 @@ def determine_basal_autoisf(
         if loop_wanted_smb and loop_wanted_smb != "none":
             duration = max(duration, 60)
 
-        # insulin requirement (U) - compute after duration so rt.rate/ins can be used if present
-        target_bg = getattr(profile, "target_bg", None) or 6.4
-        insulinReq = None
+        # --- RT pre-checks: support rt as dict or as string; prioritize explicit rt.insulinReq/rate and respect disable signals ---
+        import re
         try:
-            # prefer explicit insulinReq or rate from rt if present
+            # normalize rt_obj to a dict-like view: if it's a string, parse key=value tokens
+            parsed_rt = {}
             if rt_obj and isinstance(rt_obj, dict):
+                parsed_rt = rt_obj
+            elif rt_obj and isinstance(rt_obj, str):
+                s = rt_obj
+                # simple key=value pairs like eventualBG=227.0, insulinReq=0.0, duration=60, rate=0.0
+                for m in re.finditer(r'([A-Za-z_]+)\s*=\s*([0-9]+(?:[.,][0-9]+)?)', s):
+                    k = m.group(1)
+                    v = m.group(2).replace(',', '.')
+                    try:
+                        parsed_rt[k] = float(v)
+                    except Exception:
+                        parsed_rt[k] = v
+                # also capture textual parts for later keyword search
+                parsed_rt["_raw_text"] = s.lower()
+
+            # If parsed_rt is available, use its explicit insulinReq/rate first
+            if parsed_rt:
                 try:
-                    rt_ins = rt_obj.get("insulinReq") or rt_obj.get("insulin_req") or rt_obj.get("insulinReqU")
-                    rt_rate = rt_obj.get("rate") or rt_obj.get("deliveryRate")
+                    # Explicitly check keys so numeric zero (0.0) is not treated as False
+                    rt_ins = None
+                    if "insulinReq" in parsed_rt:
+                        rt_ins = parsed_rt["insulinReq"]
+                    elif "insulin_req" in parsed_rt:
+                        rt_ins = parsed_rt["insulin_req"]
+                    elif "insulinReqU" in parsed_rt:
+                        rt_ins = parsed_rt["insulinReqU"]
+
+                    rt_rate = None
+                    if "rate" in parsed_rt:
+                        rt_rate = parsed_rt["rate"]
+                    elif "deliveryRate" in parsed_rt:
+                        rt_rate = parsed_rt["deliveryRate"]
+
+                    # If parsed_rt came from string, these may be floats already
                     if rt_ins is not None:
                         insulinReq = float(rt_ins)
-                        auto_isf_consoleLog.append(f"Using insulinReq from rt: {insulinReq:.3f} U")
-                    elif rt_rate is not None:
+                        auto_isf_consoleLog.append(f"Using insulinReq from rt (priority): {insulinReq:.3f} U")
+                    elif rt_rate is not None and duration is not None:
                         rt_rate = float(rt_rate)
                         insulinReq = rt_rate * (duration / 60.0)
-                        auto_isf_consoleLog.append(f"Using rate from rt: {rt_rate:.3f} U/h -> insulinReq {insulinReq:.3f} U")
+                        auto_isf_consoleLog.append(f"Using rate from rt (priority): {rt_rate:.3f} U/h -> insulinReq {insulinReq:.3f} U")
                 except Exception:
                     pass
 
-            if insulinReq is None:
+
+                # Detect explicit disable/zeroTemp signals from dict fields or parsed text
+                try:
+                    # collect text to search: prefer parsed_rt["_raw_text"], else combine reason/console fields
+                    txt = ""
+                    if isinstance(parsed_rt, dict) and parsed_rt.get("_raw_text"):
+                        txt = parsed_rt.get("_raw_text")
+                    else:
+                        reason = str(parsed_rt.get("reason") or parsed_rt.get("reasonText") or "")
+                        console_log = str(parsed_rt.get("consoleLog") or parsed_rt.get("console_log") or "")
+                        console_err = str(parsed_rt.get("consoleError") or parsed_rt.get("console_error") or "")
+                        txt = " ".join([reason, console_log, console_err]).lower()
+
+                    # numeric signals
+                    ztd = parsed_rt.get("zeroTempDuration") or parsed_rt.get("zero_temp_duration") or 0
+                    zte = parsed_rt.get("zeroTempEffect") or parsed_rt.get("zero_temp_effect") or 0
+                    min_guard = None
+                    try:
+                        mg = parsed_rt.get("minGuardBG") or parsed_rt.get("min_guard_bg") or parsed_rt.get("minGuard")
+                        if mg is not None:
+                            min_guard = float(str(mg).replace(",", "."))
+                    except Exception:
+                        min_guard = None
+
+                    # keyword patterns that indicate SMB disabled / zero temp / projected below safe guard
+                    if ("disabling smb" in txt) or ("disable smb" in txt) or ("min guard" in txt) \
+                       or ("projected below" in txt) or ("minguardbg" in txt) or ("minGuardBG" in txt) \
+                       or (isinstance(ztd, (int, float)) and float(ztd) > 0) \
+                       or (isinstance(zte, (int, float)) and abs(float(zte)) > 0) \
+                       or (min_guard is not None and min_guard < 3.6):
+                        auto_isf_consoleLog.append("RT indicates SMB/insulin delivery disabled — forcing insulinReq=0 and rate=0")
+                        insulinReq = 0.0
+                        rate = 0.0
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # --- end RT pre-checks ---
+
+
+        # insulin requirement (U) - compute after duration so rt.rate/ins can be used if present
+        target_bg = getattr(profile, "target_bg", None) or 6.4
+        # Do not reset insulinReq if RT pre-checks already set it.
+        try:
+            if 'insulinReq' in locals() and insulinReq is not None:
+                # insulinReq already provided by RT pre-checks — keep it
+                pass
+            else:
                 insulinReq = (eventualBG - target_bg) / effective_sens
         except Exception:
             insulinReq = None
@@ -271,6 +346,37 @@ def determine_basal_autoisf(
                 if abs(insulinReq) < smb_threshold and getattr(profile, "enableSMB_always", False):
                     smb_ratio_local = getattr(profile, "smb_delivery_ratio", smb_ratio or 0.5)
                     raw_rate = raw_rate * float(smb_ratio_local)
+
+                # If RT explicitly provided a rate, prefer it as final (respect RT decision)
+                try:
+                    if rt_obj and isinstance(rt_obj, dict):
+                        rt_rate_provided = rt_obj.get("rate") or rt_obj.get("deliveryRate")
+                        if rt_rate_provided is not None:
+                            rt_rate_val = float(rt_rate_provided)
+                            auto_isf_consoleLog.append(f"RT provided rate: {rt_rate_val:.3f} U/h — using RT rate as final")
+                            raw_rate = rt_rate_val
+                except Exception:
+                    pass
+
+                # If RT explicitly set insulinReq to 0 (or we forced it due to disabling SMB), ensure raw_rate is zero
+                try:
+                    if 'insulinReq' in locals() and insulinReq == 0.0:
+                        raw_rate = 0.0
+                        auto_isf_consoleLog.append("insulinReq==0.0 (RT or pre-check) — forcing raw_rate=0.0")
+                except Exception:
+                    pass
+
+                # final logging of source
+                final_rate_source = "computed"
+                try:
+                    if rt_obj and isinstance(rt_obj, dict) and (rt_obj.get("rate") or rt_obj.get("deliveryRate")) is not None:
+                        final_rate_source = "rt_rate"
+                    elif 'insulinReq' in locals() and insulinReq is not None and ('rt_ins' in locals() and rt_ins is not None):
+                        final_rate_source = "rt_insulinReq"
+                except Exception:
+                    pass
+
+                auto_isf_consoleLog.append(f"Final rate decision (pre-clamp): raw_rate={raw_rate:.3f} source={final_rate_source}")
 
                 rate = max(0.0, raw_rate)
         except Exception:
