@@ -1,4 +1,4 @@
-name: Tests
+name: CI
 
 on:
   push:
@@ -20,19 +20,25 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install flake8 mypy pytest
+          pip install flake8 mypy pytest black isort
           pip install .
 
+      - name: Run isort (check only)
+        run: |
+          isort . --check-only
+
+      - name: Run black (check only)
+        run: |
+          black . --check
 
       - name: Run flake8
         run: |
-          flake8 aaps_emulator
+          flake8 ./aaps_emulator
 
       - name: Run mypy
         run: |
-          mypy aaps_emulator
+          mypy ./aaps_emulator
 
       - name: Run pytest
         run: |
-          pip install pytest
           pytest -q
