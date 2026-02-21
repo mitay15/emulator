@@ -10,8 +10,9 @@ import csv
 import json
 import os
 
-from aaps_emulator.analysis.compare_runner import run_compare_on_all_logs
 from core.autoisf_algorithm import determine_basal_autoisf
+
+from aaps_emulator.analysis.compare_runner import run_compare_on_all_logs
 
 
 def main():

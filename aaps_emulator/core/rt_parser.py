@@ -1,6 +1,6 @@
 import re
-from typing import Any, Dict, Optional
 from re import Match
+from typing import Any, Dict, Optional
 
 
 def parse_rt_to_dict(rt_obj: Any) -> Dict:
