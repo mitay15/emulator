@@ -15,16 +15,18 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.11"
 
-      - name: Install project
+      - name: Install project and test deps
         run: |
           python -m pip install --upgrade pip
           pip install -e .
-          pip install pytest
+          pip install pytest pytest-cov
 
-      - name: Run pytest
-        run: pytest -q
+      - name: Run pytest with coverage
+        run: |
+          pytest --cov=aaps_emulator --cov-report=xml --cov-report=term-missing -q
 
       - name: Run log checker
-        run: python tools/log_checker.py
+        run: |
+          python tools/log_checker.py
