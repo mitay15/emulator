@@ -1,28 +1,29 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import List, Optional
-import math
-from datetime import datetime, timezone
 
+import math
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import List, Optional
 
 # ============================
 # БАЗОВЫЕ СТРУКТУРЫ ДАННЫХ
 # ============================
 
+
 @dataclass
 class GlucoseStatus:
-    glucose: float              # BG in mmol/L
-    delta: float                # 5m delta in mmol/L
-    short_avg_delta: float      # 15m delta
-    long_avg_delta: float       # 40m delta
-    date: int                   # timestamp (ms)
-    noise: float                # CGM noise level
+    glucose: float  # BG in mmol/L
+    delta: float  # 5m delta in mmol/L
+    short_avg_delta: float  # 15m delta
+    long_avg_delta: float  # 40m delta
+    date: int  # timestamp (ms)
+    noise: float  # CGM noise level
 
 
 @dataclass
 class IobTotal:
-    iob: float                  # insulin on board (U)
-    activity: float             # insulin activity (U/min)
+    iob: float  # insulin on board (U)
+    activity: float  # insulin activity (U/min)
     iob_with_zero_temp: Optional["IobTotal"] = None
 
 
@@ -43,9 +44,9 @@ class AutosensResult:
 
 @dataclass
 class CurrentTemp:
-    duration: int               # minutes remaining
-    rate: float                 # U/hr
-    minutes_running: int        # how long temp basal has been running
+    duration: int  # minutes remaining
+    rate: float  # U/hr
+    minutes_running: int  # how long temp basal has been running
 
 
 @dataclass
@@ -65,12 +66,12 @@ class OapsProfileAutoIsf:
     target_bg: float
 
     # insulin / carbs
-    sens: float                 # ISF (mmol/U)
-    carb_ratio: float           # CR (g/U)
-    current_basal: float        # U/hr
-    max_basal: float            # U/hr
-    max_daily_basal: float      # U/hr
-    max_iob: float              # U
+    sens: float  # ISF (mmol/U)
+    carb_ratio: float  # CR (g/U)
+    current_basal: float  # U/hr
+    max_basal: float  # U/hr
+    max_daily_basal: float  # U/hr
+    max_iob: float  # U
 
     # autosens
     autosens_max: float
@@ -148,10 +149,11 @@ class RT:
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 # ============================
 
+
 def round_dec(value: float, digits: int) -> float:
     if math.isnan(value):
         return float("nan")
-    scale = 10.0 ** digits
+    scale = 10.0**digits
     return round(value * scale) / scale
 
 
@@ -179,17 +181,26 @@ def calculate_expected_delta(target_bg: float, eventual_bg: float, bgi: float) -
 def get_max_safe_basal(profile: OapsProfileAutoIsf) -> float:
     return min(
         profile.max_basal,
-        min(profile.max_daily_basal * profile.autosens_max,
-            profile.current_basal * profile.autosens_max * 2)
+        min(
+            profile.max_daily_basal * profile.autosens_max,
+            profile.current_basal * profile.autosens_max * 2,
+        ),
     )
 
 
-def set_temp_basal(rate: float, duration: int, profile: OapsProfileAutoIsf,
-                   rT: RT, currenttemp: CurrentTemp) -> RT:
+def set_temp_basal(
+    rate: float,
+    duration: int,
+    profile: OapsProfileAutoIsf,
+    rT: RT,
+    currenttemp: CurrentTemp,
+) -> RT:
     max_safe_basal = min(
         profile.max_basal,
-        min(profile.max_daily_basal * profile.autosens_max,
-            profile.current_basal * profile.autosens_max * 2)
+        min(
+            profile.max_daily_basal * profile.autosens_max,
+            profile.current_basal * profile.autosens_max * 2,
+        ),
     )
     if rate < 0:
         rate = 0.0
@@ -198,11 +209,13 @@ def set_temp_basal(rate: float, duration: int, profile: OapsProfileAutoIsf,
 
     suggested_rate = rate
 
-    if (currenttemp.duration > (duration - 10)
-            and currenttemp.duration <= 120
-            and suggested_rate <= currenttemp.rate * 1.2
-            and suggested_rate >= currenttemp.rate * 0.8
-            and duration > 0):
+    if (
+        currenttemp.duration > (duration - 10)
+        and currenttemp.duration <= 120
+        and suggested_rate <= currenttemp.rate * 1.2
+        and suggested_rate >= currenttemp.rate * 0.8
+        and duration > 0
+    ):
         rT.reason += f" {currenttemp.duration}m left and {without_zeros(currenttemp.rate)} ~ req {without_zeros(suggested_rate)}U/hr: no temp required"
         return rT
 
@@ -227,17 +240,21 @@ def set_temp_basal(rate: float, duration: int, profile: OapsProfileAutoIsf,
         return rT
 
 
-def enable_smb(profile: OapsProfileAutoIsf,
-               microbolus_allowed: bool,
-               meal: MealData,
-               target_bg: float,
-               console: List[str]) -> bool:
+def enable_smb(
+    profile: OapsProfileAutoIsf,
+    microbolus_allowed: bool,
+    meal: MealData,
+    target_bg: float,
+    console: List[str],
+) -> bool:
     if not microbolus_allowed:
         console.append("SMB disabled (!microBolusAllowed)")
         return False
-    elif (not profile.allowSMB_with_high_temptarget
-          and profile.temptarget_set
-          and target_bg > 5.5):  # 100 mg/dL
+    elif (
+        not profile.allowSMB_with_high_temptarget
+        and profile.temptarget_set
+        and target_bg > 5.5
+    ):  # 100 mg/dL
         console.append(f"SMB disabled due to high temptarget of {target_bg}")
         return False
 
@@ -257,13 +274,16 @@ def enable_smb(profile: OapsProfileAutoIsf,
         console.append(f"SMB enabled for temptarget of {convert_bg(target_bg)}")
         return True
 
-    console.append("SMB disabled (no enableSMB preferences active or no condition satisfied)")
+    console.append(
+        "SMB disabled (no enableSMB preferences active or no condition satisfied)"
+    )
     return False
 
 
 # ============================
 # ОСНОВНОЙ АЛГОРИТМ AUTOISF
 # ============================
+
 
 def determine_basal_autoisf(
     glucose_status: GlucoseStatus,
@@ -282,7 +302,7 @@ def determine_basal_autoisf(
     smb_max_range_extension: float,
     iob_threshold_percent: int,
     auto_isf_consoleError: List[str],
-    auto_isf_consoleLog: List[str]
+    auto_isf_consoleLog: List[str],
 ) -> RT:
 
     consoleError: List[str] = []
@@ -293,7 +313,7 @@ def determine_basal_autoisf(
         running_dynamic_isf=autoIsfMode,
         timestamp=currentTime,
         consoleLog=consoleLog,
-        consoleError=consoleError
+        consoleError=consoleError,
     )
 
     deliverAt = currentTime
@@ -313,9 +333,13 @@ def determine_basal_autoisf(
     elif bg > 3.3 and flatBGsDetected:  # >60 mg/dL
         rT.reason += "Error: CGM data is unchanged for the past ~45m"
 
-    if (bg <= 0.6 or noise >= 3 or
-            minAgo > 12 or minAgo < -5 or
-            (bg > 3.3 and flatBGsDetected)):
+    if (
+        bg <= 0.6
+        or noise >= 3
+        or minAgo > 12
+        or minAgo < -5
+        or (bg > 3.3 and flatBGsDetected)
+    ):
         if currenttemp.rate > basal:
             rT.reason += f". Replacing high temp basal of {currenttemp.rate} with neutral temp of {basal}"
             rT.deliverAt = deliverAt
@@ -340,13 +364,22 @@ def determine_basal_autoisf(
 
     sensitivityRatio = 1.0
     exercise_ratio = 1.0
-    high_temptarget_raises_sensitivity = profile.exercise_mode or profile.high_temptarget_raises_sensitivity
+    high_temptarget_raises_sensitivity = (
+        profile.exercise_mode or profile.high_temptarget_raises_sensitivity
+    )
     normalTarget = 5.5  # 100 mg/dL
     halfBasalTarget = profile.half_basal_exercise_target / 18.0  # mg/dL→mmol
 
-    if ((high_temptarget_raises_sensitivity and profile.temptarget_set and target_bg > normalTarget)
-            or (profile.low_temptarget_lowers_sensitivity and profile.temptarget_set and target_bg < normalTarget)):
-        c = (halfBasalTarget - normalTarget)
+    if (
+        high_temptarget_raises_sensitivity
+        and profile.temptarget_set
+        and target_bg > normalTarget
+    ) or (
+        profile.low_temptarget_lowers_sensitivity
+        and profile.temptarget_set
+        and target_bg < normalTarget
+    ):
+        c = halfBasalTarget - normalTarget
         if c * (c + target_bg - normalTarget) <= 0:
             sensitivityRatio = profile.autosens_max
         else:
@@ -354,7 +387,9 @@ def determine_basal_autoisf(
             sensitivityRatio = min(sensitivityRatio, profile.autosens_max)
             sensitivityRatio = round_dec(sensitivityRatio, 2)
             exercise_ratio = sensitivityRatio
-            consoleError.append(f"Sensitivity ratio set to {sensitivityRatio} based on temp target of {target_bg}; ")
+            consoleError.append(
+                f"Sensitivity ratio set to {sensitivityRatio} based on temp target of {target_bg}; "
+            )
     else:
         sensitivityRatio = autosens_data.ratio
         consoleError.append(f"Autosens ratio: {sensitivityRatio}; ")
@@ -371,8 +406,9 @@ def determine_basal_autoisf(
         consoleError.append(f"Basal unchanged: {basal};")
 
     if not profile.temptarget_set:
-        if ((profile.sensitivity_raises_target and autosens_data.ratio < 1)
-                or (profile.resistance_lowers_target and autosens_data.ratio > 1)):
+        if (profile.sensitivity_raises_target and autosens_data.ratio < 1) or (
+            profile.resistance_lowers_target and autosens_data.ratio > 1
+        ):
             min_bg = round_dec((min_bg - 3.3) / autosens_data.ratio, 1) + 3.3
             max_bg = round_dec((max_bg - 3.3) / autosens_data.ratio, 1) + 3.3
             new_target_bg = round_dec((target_bg - 3.3) / autosens_data.ratio, 1) + 3.3
@@ -393,7 +429,10 @@ def determine_basal_autoisf(
 
     minDelta = min(glucose_status.delta, glucose_status.short_avg_delta)
     minAvgDelta = min(glucose_status.short_avg_delta, glucose_status.long_avg_delta)
-    maxDelta = max(glucose_status.delta, max(glucose_status.short_avg_delta, glucose_status.long_avg_delta))
+    maxDelta = max(
+        glucose_status.delta,
+        max(glucose_status.short_avg_delta, glucose_status.long_avg_delta),
+    )
 
     profile_sens = round_dec(profile.sens, 1)
     adjusted_sens = round_dec(profile.sens / sensitivityRatio, 1)
@@ -415,14 +454,22 @@ def determine_basal_autoisf(
         consoleError.extend(auto_isf_consoleError)
 
     iobTHtolerance = 130.0
-    iobTHvirtual = iob_threshold_percent * iobTHtolerance / 10000.0 * profile.max_iob * iobTH_reduction_ratio
+    iobTHvirtual = (
+        iob_threshold_percent
+        * iobTHtolerance
+        / 10000.0
+        * profile.max_iob
+        * iobTH_reduction_ratio
+    )
 
     enableSMB = False
     if microBolusAllowed and loop_wanted_smb != "AAPS":
         if loop_wanted_smb in ("enforced", "fullLoop"):
             enableSMB = True
     else:
-        enableSMB = enable_smb(profile, microBolusAllowed, meal_data, target_bg, consoleError)
+        enableSMB = enable_smb(
+            profile, microBolusAllowed, meal_data, target_bg, consoleError
+        )
 
     bgi = round_dec(-iob_data.activity * sens * 5, 2)
 
@@ -438,7 +485,9 @@ def determine_basal_autoisf(
         if iob_data.iob > 0:
             naive_eventualBG = round_dec(bg - (iob_data.iob * sens), 1)
         else:
-            naive_eventualBG = round_dec(bg - (iob_data.iob * min(sens, profile.sens)), 1)
+            naive_eventualBG = round_dec(
+                bg - (iob_data.iob * min(sens, profile.sens)), 1
+            )
 
     eventualBG = naive_eventualBG + deviation
 
@@ -447,19 +496,33 @@ def determine_basal_autoisf(
         adjustedTargetBG = round_dec(max(4.4, target_bg - (bg - target_bg) / 3.0), 1)
         adjustedMaxBG = round_dec(max(4.4, max_bg - (bg - max_bg) / 3.0), 1)
 
-        if eventualBG > adjustedMinBG and naive_eventualBG > adjustedMinBG and min_bg > adjustedMinBG:
-            consoleError.append(f"Adjusting targets for high BG: min_bg from {min_bg} to {adjustedMinBG}; ")
+        if (
+            eventualBG > adjustedMinBG
+            and naive_eventualBG > adjustedMinBG
+            and min_bg > adjustedMinBG
+        ):
+            consoleError.append(
+                f"Adjusting targets for high BG: min_bg from {min_bg} to {adjustedMinBG}; "
+            )
             min_bg = adjustedMinBG
         else:
             consoleError.append(f"min_bg unchanged: {min_bg}; ")
 
-        if eventualBG > adjustedTargetBG and naive_eventualBG > adjustedTargetBG and target_bg > adjustedTargetBG:
+        if (
+            eventualBG > adjustedTargetBG
+            and naive_eventualBG > adjustedTargetBG
+            and target_bg > adjustedTargetBG
+        ):
             consoleError.append(f"target_bg from {target_bg} to {adjustedTargetBG}; ")
             target_bg = adjustedTargetBG
         else:
             consoleError.append(f"target_bg unchanged: {target_bg}; ")
 
-        if eventualBG > adjustedMaxBG and naive_eventualBG > adjustedMaxBG and max_bg > adjustedMaxBG:
+        if (
+            eventualBG > adjustedMaxBG
+            and naive_eventualBG > adjustedMaxBG
+            and max_bg > adjustedMaxBG
+        ):
             consoleError.append(f"max_bg from {max_bg} to {adjustedMaxBG}")
             max_bg = adjustedMaxBG
         else:
@@ -482,7 +545,7 @@ def determine_basal_autoisf(
         sensitivityRatio=sensitivityRatio,
         consoleLog=consoleLog,
         consoleError=consoleError,
-        variable_sens=profile.variable_sens
+        variable_sens=profile.variable_sens,
     )
 
     COBpredBGs: List[float] = [bg]
@@ -502,7 +565,9 @@ def determine_basal_autoisf(
     maxCarbAbsorptionRate = 30
     maxCI = round_dec(maxCarbAbsorptionRate * csf * 5 / 60, 1)
     if ci > maxCI:
-        consoleError.append(f"Limiting carb impact from {ci} to {maxCI} mmol/L per 5m ( {maxCarbAbsorptionRate} g/h )")
+        consoleError.append(
+            f"Limiting carb impact from {ci} to {maxCI} mmol/L per 5m ( {maxCarbAbsorptionRate} g/h )"
+        )
         ci = maxCI
 
     remainingCATimeMin = 3.0
@@ -511,7 +576,9 @@ def determine_basal_autoisf(
     remainingCATime = remainingCATimeMin
 
     if meal_data.carbs != 0:
-        remainingCATimeMin = max(remainingCATimeMin, meal_data.meal_cob / assumedCarbAbsorptionRate)
+        remainingCATimeMin = max(
+            remainingCATimeMin, meal_data.meal_cob / assumedCarbAbsorptionRate
+        )
         lastCarbAge = round_dec((systemTime - meal_data.last_carb_time) / 60000.0, 0)
         fractionCOBAbsorbed = (meal_data.carbs - meal_data.meal_cob) / meal_data.carbs
         remainingCATime = remainingCATimeMin + 1.5 * lastCarbAge / 60
@@ -618,14 +685,20 @@ def determine_basal_autoisf(
         if IOBpredBG > bg:
             pass
 
-        if (cid != 0.0 or remainingCIpeak > 0) and len(COBpredBGs) > insulinPeak5m and COBpredBG < minCOBPredBG:
+        if (
+            (cid != 0.0 or remainingCIpeak > 0)
+            and len(COBpredBGs) > insulinPeak5m
+            and COBpredBG < minCOBPredBG
+        ):
             minCOBPredBG = round_dec(COBpredBG, 0)
         if enableUAM and len(UAMpredBGs) > 12 and UAMpredBG < minUAMPredBG:
             minUAMPredBG = round_dec(UAMpredBG, 0)
 
     if meal_data.meal_cob > 0:
         consoleError.append("predCIs (mmol/L/5m):" + " ".join(str(x) for x in predCIs))
-        consoleError.append("remainingCIs:      " + " ".join(str(x) for x in remainingCIs))
+        consoleError.append(
+            "remainingCIs:      " + " ".join(str(x) for x in remainingCIs)
+        )
 
     rT.predBGs = Predictions()
 
@@ -635,7 +708,9 @@ def determine_basal_autoisf(
             break
         else:
             IOBpredBGs.pop()
-    rT.predBGs.IOB = [int(round(x * 18)) for x in IOBpredBGs]  # если хочешь хранить в mg/dL — убери
+    rT.predBGs.IOB = [
+        int(round(x * 18)) for x in IOBpredBGs
+    ]  # если хочешь хранить в mg/dL — убери
 
     lastIOBpredBG = IOBpredBGs[-1]
 
@@ -682,7 +757,9 @@ def determine_basal_autoisf(
             eventualBG = max(eventualBG, round_dec(UAMpredBGs[-1], 1))
         rT.eventualBG = eventualBG
 
-    consoleError.append(f"UAM Impact: {uci} mmol/L per 5m; UAM Duration: {UAMduration} hours")
+    consoleError.append(
+        f"UAM Impact: {uci} mmol/L per 5m; UAM Duration: {UAMduration} hours"
+    )
     consoleError.append(f"EventualBG is {eventualBG} ;")
 
     minIOBPredBG = max(2.2, minIOBPredBG)
@@ -690,24 +767,36 @@ def determine_basal_autoisf(
     minUAMPredBG = max(2.2, minUAMPredBG)
     minPredBG = round_dec(minIOBPredBG, 1)
 
-    fractionCarbsLeft = meal_data.meal_cob / meal_data.carbs if meal_data.carbs != 0 else 0
+    fractionCarbsLeft = (
+        meal_data.meal_cob / meal_data.carbs if meal_data.carbs != 0 else 0
+    )
 
     if minUAMPredBG < 999 and minCOBPredBG < 999:
-        avgPredBG = round_dec((1 - fractionCarbsLeft) * (lastUAMpredBG or minUAMPredBG) +
-                              fractionCarbsLeft * (lastCOBpredBG or minCOBPredBG), 1)
+        avgPredBG = round_dec(
+            (1 - fractionCarbsLeft) * (lastUAMpredBG or minUAMPredBG)
+            + fractionCarbsLeft * (lastCOBpredBG or minCOBPredBG),
+            1,
+        )
     elif minCOBPredBG < 999:
-        avgPredBG = round_dec((IOBpredBGs[-1] + (lastCOBpredBG or minCOBPredBG)) / 2.0, 1)
+        avgPredBG = round_dec(
+            (IOBpredBGs[-1] + (lastCOBpredBG or minCOBPredBG)) / 2.0, 1
+        )
     elif minUAMPredBG < 999:
-        avgPredBG = round_dec((IOBpredBGs[-1] + (lastUAMpredBG or minUAMPredBG)) / 2.0, 1)
+        avgPredBG = round_dec(
+            (IOBpredBGs[-1] + (lastUAMpredBG or minUAMPredBG)) / 2.0, 1
+        )
     else:
         avgPredBG = round_dec(IOBpredBGs[-1], 1)
 
     if minZTGuardBG > avgPredBG:
         avgPredBG = minZTGuardBG
 
-    if (cid > 0 or remainingCIpeak > 0):
+    if cid > 0 or remainingCIpeak > 0:
         if enableUAM:
-            minGuardBG = fractionCarbsLeft * minCOBGuardBG + (1 - fractionCarbsLeft) * minUAMGuardBG
+            minGuardBG = (
+                fractionCarbsLeft * minCOBGuardBG
+                + (1 - fractionCarbsLeft) * minUAMGuardBG
+            )
         else:
             minGuardBG = minCOBGuardBG
     elif enableUAM:
@@ -731,8 +820,13 @@ def determine_basal_autoisf(
         if not enableUAM and minCOBPredBG < 999:
             minPredBG = round_dec(max(minIOBPredBG, minCOBPredBG), 1)
         elif minCOBPredBG < 999:
-            blendedMinPredBG = fractionCarbsLeft * minCOBPredBG + (1 - fractionCarbsLeft) * minZTUAMPredBG
-            minPredBG = round_dec(max(minIOBPredBG, max(minCOBPredBG, blendedMinPredBG)), 1)
+            blendedMinPredBG = (
+                fractionCarbsLeft * minCOBPredBG
+                + (1 - fractionCarbsLeft) * minZTUAMPredBG
+            )
+            minPredBG = round_dec(
+                max(minIOBPredBG, max(minCOBPredBG, blendedMinPredBG)), 1
+            )
         elif enableUAM:
             minPredBG = minZTUAMPredBG
         else:
@@ -742,14 +836,21 @@ def determine_basal_autoisf(
 
     minPredBG = min(minPredBG, avgPredBG)
 
-    consoleError.append(f"minPredBG: {minPredBG} minIOBPredBG: {minIOBPredBG} minZTGuardBG: {minZTGuardBG}")
+    consoleError.append(
+        f"minPredBG: {minPredBG} minIOBPredBG: {minIOBPredBG} minZTGuardBG: {minZTGuardBG}"
+    )
     if minCOBPredBG < 999:
         consoleError.append(f" minCOBPredBG: {minCOBPredBG}")
     if minUAMPredBG < 999:
         consoleError.append(f" minUAMPredBG: {minUAMPredBG}")
-    consoleError.append(f" avgPredBG: {avgPredBG} COB: {meal_data.meal_cob} / {meal_data.carbs}")
+    consoleError.append(
+        f" avgPredBG: {avgPredBG} COB: {meal_data.meal_cob} / {meal_data.carbs}"
+    )
 
-    if maxCOBGuardBG := maxCOBPredBG if 'maxCOBPredBG' in locals() else bg:
+    # ensure maxCOBPredBG exists
+    maxCOBPredBG = locals().get("maxCOBPredBG", None)
+
+    if maxCOBGuardBG := maxCOBPredBG if maxCOBPredBG is not None else bg:
         if maxCOBGuardBG > bg:
             minPredBG = min(minPredBG, maxCOBGuardBG)
 
@@ -794,20 +895,28 @@ def determine_basal_autoisf(
                 break
 
     if enableSMB and minGuardBG < threshold:
-        consoleError.append(f"minGuardBG {convert_bg(minGuardBG)} projected below {convert_bg(threshold)} - disabling SMB")
+        consoleError.append(
+            f"minGuardBG {convert_bg(minGuardBG)} projected below {convert_bg(threshold)} - disabling SMB"
+        )
         enableSMB = False
 
     maxDeltaPercentage = 0.2
     if loop_wanted_smb == "fullLoop":
         maxDeltaPercentage = 0.3
     if maxDelta > maxDeltaPercentage * bg:
-        consoleError.append(f"maxDelta {convert_bg(maxDelta)} > {100 * maxDeltaPercentage}% of BG {convert_bg(bg)} - disabling SMB")
+        consoleError.append(
+            f"maxDelta {convert_bg(maxDelta)} > {100 * maxDeltaPercentage}% of BG {convert_bg(bg)} - disabling SMB"
+        )
         rT.reason += f"maxDelta {convert_bg(maxDelta)} > {100 * maxDeltaPercentage}% of BG {convert_bg(bg)}: SMB disabled; "
         enableSMB = False
 
-    consoleError.append(f"BG projected to remain above {convert_bg(min_bg)} for {minutesAboveMinBG} minutes")
+    consoleError.append(
+        f"BG projected to remain above {convert_bg(min_bg)} for {minutesAboveMinBG} minutes"
+    )
     if minutesAboveThreshold < 240 or minutesAboveMinBG < 60:
-        consoleError.append(f"BG projected to remain above {convert_bg(threshold)} for {minutesAboveThreshold} minutes")
+        consoleError.append(
+            f"BG projected to remain above {convert_bg(threshold)} for {minutesAboveThreshold} minutes"
+        )
 
     zeroTempDuration = minutesAboveThreshold
     zeroTempEffectDouble = profile.current_basal * sens * zeroTempDuration / 60
@@ -822,11 +931,15 @@ def determine_basal_autoisf(
         rT.carbsReqWithin = minutesAboveThreshold
         rT.reason += f"{carbsReq} add'l carbs req w/in {minutesAboveThreshold}m; "
 
-    if (bg < threshold and
-            iob_data.iob < -profile.current_basal * 20 / 60 and
-            minDelta > 0 and
-            minDelta > expectedDelta):
-        rT.reason += f"IOB {iob_data.iob} < {round_dec(-profile.current_basal * 20 / 60, 2)}"
+    if (
+        bg < threshold
+        and iob_data.iob < -profile.current_basal * 20 / 60
+        and minDelta > 0
+        and minDelta > expectedDelta
+    ):
+        rT.reason += (
+            f"IOB {iob_data.iob} < {round_dec(-profile.current_basal * 20 / 60, 2)}"
+        )
         rT.reason += f" and minDelta {convert_bg(minDelta)} > expectedDelta {convert_bg(expectedDelta)}; "
     elif bg < threshold or minGuardBG < threshold:
         rT.reason += f"minGuardBG {convert_bg(minGuardBG)} < {convert_bg(threshold)}"
@@ -837,7 +950,14 @@ def determine_basal_autoisf(
         durationReq = min(120, max(30, durationReq))
         return set_temp_basal(0.0, durationReq, profile, rT, currenttemp)
 
-    minutes = datetime.fromtimestamp(rT.deliverAt / 1000, tz=timezone.utc).minute
+    deliver_at = rT.deliverAt
+
+    if deliver_at is None:
+        # fallback: используем текущее время
+        deliver_at = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+
+    minutes = datetime.fromtimestamp(deliver_at / 1000, tz=timezone.utc).minute
+
     if profile.skip_neutral_temps and minutes >= 55:
         rT.reason += f"; Canceling temp at {minutes}m past the hour. "
         return set_temp_basal(0.0, 0, profile, rT, currenttemp)
@@ -856,7 +976,9 @@ def determine_basal_autoisf(
                 rT.reason += f", temp {currenttemp.rate} ~ req {without_zeros(round_dec(basal, 2))}U/hr. "
                 return rT
             else:
-                rT.reason += f"; setting current basal of {round_dec(basal, 2)} as temp. "
+                rT.reason += (
+                    f"; setting current basal of {round_dec(basal, 2)} as temp. "
+                )
                 return set_temp_basal(basal, 30, profile, rT, currenttemp)
 
         insulinReq = 2 * min(0.0, (eventualBG - target_bg) / sens)
@@ -880,7 +1002,7 @@ def determine_basal_autoisf(
             return rT
         else:
             if rate <= 0:
-                bgUndershoot = (target_bg - naive_eventualBG)
+                bgUndershoot = target_bg - naive_eventualBG
                 worstCaseInsulinReq = bgUndershoot / sens
                 durationReq = round(60 * worstCaseInsulinReq / profile.current_basal)
                 if durationReq < 0:
@@ -911,7 +1033,9 @@ def determine_basal_autoisf(
                 rT.reason += f", temp {currenttemp.rate} ~ req {without_zeros(round_dec(basal, 2))}U/hr. "
                 return rT
             else:
-                rT.reason += f"; setting current basal of {round_dec(basal, 2)} as temp. "
+                rT.reason += (
+                    f"; setting current basal of {round_dec(basal, 2)} as temp. "
+                )
                 return set_temp_basal(basal, 30, profile, rT, currenttemp)
 
     if min(eventualBG, minPredBG) < max_bg:
@@ -921,7 +1045,9 @@ def determine_basal_autoisf(
                 rT.reason += f", temp {currenttemp.rate} ~ req {without_zeros(round_dec(basal, 2))}U/hr. "
                 return rT
             else:
-                rT.reason += f"; setting current basal of {round_dec(basal, 2)} as temp. "
+                rT.reason += (
+                    f"; setting current basal of {round_dec(basal, 2)} as temp. "
+                )
                 return set_temp_basal(basal, 30, profile, rT, currenttemp)
 
     if eventualBG >= max_bg:
@@ -949,22 +1075,41 @@ def determine_basal_autoisf(
             mealInsulinReq = round_dec(meal_data.meal_cob / profile.carb_ratio, 3)
             smb_max_range = smb_max_range_extension
             if iob_data.iob > mealInsulinReq and iob_data.iob > 0:
-                consoleError.append(f"IOB {iob_data.iob} > COB {meal_data.meal_cob}; mealInsulinReq = {mealInsulinReq}")
+                consoleError.append(
+                    f"IOB {iob_data.iob} > COB {meal_data.meal_cob}; mealInsulinReq = {mealInsulinReq}"
+                )
                 consoleError.append(
                     f"profile.maxUAMSMBBasalMinutes: {profile.maxUAMSMBBasalMinutes} profile.current_basal: {profile.current_basal}"
                 )
-                maxBolus = round_dec(smb_max_range * profile.current_basal * profile.maxUAMSMBBasalMinutes / 60, 1)
+                maxBolus = round_dec(
+                    smb_max_range
+                    * profile.current_basal
+                    * profile.maxUAMSMBBasalMinutes
+                    / 60,
+                    1,
+                )
             else:
                 consoleError.append(
                     f"profile.maxSMBBasalMinutes: {profile.maxSMBBasalMinutes} profile.current_basal: {profile.current_basal}"
                 )
-                maxBolus = round_dec(smb_max_range * profile.current_basal * profile.maxSMBBasalMinutes / 60, 1)
+                maxBolus = round_dec(
+                    smb_max_range
+                    * profile.current_basal
+                    * profile.maxSMBBasalMinutes
+                    / 60,
+                    1,
+                )
 
             roundSMBTo = 1 / profile.bolus_increment
-            microBolus = math.floor(min(insulinReq / 2, maxBolus) * roundSMBTo) / roundSMBTo
+            microBolus = (
+                math.floor(min(insulinReq / 2, maxBolus) * roundSMBTo) / roundSMBTo
+            )
             if autoIsfMode:
                 microBolus = min(insulinReq * smb_ratio, maxBolus)
-                if microBolus > iobTHvirtual - iob_data.iob and loop_wanted_smb in ("fullLoop", "enforced"):
+                if microBolus > iobTHvirtual - iob_data.iob and loop_wanted_smb in (
+                    "fullLoop",
+                    "enforced",
+                ):
                     microBolus = iobTHvirtual - iob_data.iob
                     consoleError.append(
                         f"Full loop capped SMB at {round_dec(microBolus, 2)} to not exceed {iobTHtolerance}% of effective iobTH {round_dec(iobTHvirtual / iobTHtolerance * 100, 2)}U"
@@ -972,19 +1117,25 @@ def determine_basal_autoisf(
                 microBolus = math.floor(microBolus * roundSMBTo) / roundSMBTo
 
             smbTarget = target_bg
-            worstCaseInsulinReq = (smbTarget - (naive_eventualBG + minIOBPredBG) / 2.0) / sens
+            worstCaseInsulinReq = (
+                smbTarget - (naive_eventualBG + minIOBPredBG) / 2.0
+            ) / sens
             durationReq = round(60 * worstCaseInsulinReq / profile.current_basal)
             durationReq = round(durationReq / 30) * 30
             durationReq = min(120, max(0, durationReq))
 
             rT.rate = basal
             rT.duration = durationReq
-            rT.reason += f" SMB: {microBolus}U, setting temp {basal}U/hr for {durationReq}m"
+            rT.reason += (
+                f" SMB: {microBolus}U, setting temp {basal}U/hr for {durationReq}m"
+            )
             return rT
         else:
             if currenttemp.duration > 15 and abs(basal - currenttemp.rate) < 1e-9:
                 rT.reason += f" temp {currenttemp.rate} ~ req {without_zeros(round_dec(basal, 2))}U/hr. "
                 return rT
             else:
-                rT.reason += f"; setting current basal of {round_dec(basal, 2)} as temp. "
+                rT.reason += (
+                    f"; setting current basal of {round_dec(basal, 2)} as temp. "
+                )
                 return set_temp_basal(basal, 30, profile, rT, currenttemp)

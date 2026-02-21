@@ -5,11 +5,14 @@ Creates: aaps_emulator/tests/diffs_with_inputs.csv
 Run from inside aaps_emulator:
   python -m tools.dump_diffs_and_inputs
 """
+
 import csv
-import os
 import json
-from analysis.compare_runner import run_compare_on_all_logs
+import os
+
+from aaps_emulator.analysis.compare_runner import run_compare_on_all_logs
 from core.autoisf_algorithm import determine_basal_autoisf
+
 
 def main():
     out_csv = os.path.join("aaps_emulator", "tests", "diffs_with_inputs.csv")
@@ -19,7 +22,20 @@ def main():
 
     with open(out_csv, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["idx","ts_s","aaps_eventual_ref","py_eventual","err_ev","aaps_rate_ref","py_rate","aaps_insreq_ref","py_insreq","input_json"])
+        w.writerow(
+            [
+                "idx",
+                "ts_s",
+                "aaps_eventual_ref",
+                "py_eventual",
+                "err_ev",
+                "aaps_rate_ref",
+                "py_rate",
+                "aaps_insreq_ref",
+                "py_insreq",
+                "input_json",
+            ]
+        )
         for r, b, inp in zip(rows, blocks, inputs):
             idx = r.get("idx")
             errs = []
@@ -33,7 +49,7 @@ def main():
                 meal_data=inp.get("meal"),
                 rt=inp.get("rt"),
                 auto_isf_consoleError=errs,
-                auto_isf_consoleLog=logs
+                auto_isf_consoleLog=logs,
             )
             py_ev = res.eventualBG if res.eventualBG is not None else None
             py_rate = res.rate if res.rate is not None else 0.0
@@ -48,20 +64,23 @@ def main():
             except Exception:
                 err_ev = None
 
-            w.writerow([
-                idx,
-                r.get("ts_s"),
-                ref_ev,
-                py_ev,
-                err_ev,
-                ref_rate,
-                py_rate,
-                ref_ins,
-                py_ins,
-                json.dumps(inp, default=str)
-            ])
+            w.writerow(
+                [
+                    idx,
+                    r.get("ts_s"),
+                    ref_ev,
+                    py_ev,
+                    err_ev,
+                    ref_rate,
+                    py_rate,
+                    ref_ins,
+                    py_ins,
+                    json.dumps(inp, default=str),
+                ]
+            )
 
     print("Wrote", out_csv)
+
 
 if __name__ == "__main__":
     main()

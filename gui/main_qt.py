@@ -1,14 +1,14 @@
 # aaps_emulator/gui/main_qt.py
-from PyQt6 import QtWidgets, QtGui
-import os
 
 from analysis.compare_runner import run_compare_on_all_logs
-from gui.widgets.timeline_view import TimelineView
-from gui.widgets.signals_view import SignalsView
+from gui.widgets.compare_view import CompareView
 from gui.widgets.context_view import ContextView
 from gui.widgets.details_view import DetailsView
-from gui.widgets.compare_view import CompareView
 from gui.widgets.filters_bar import FiltersBar
+from gui.widgets.signals_view import SignalsView
+from gui.widgets.timeline_view import TimelineView
+from PyQt6 import QtGui, QtWidgets
+
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -67,12 +67,13 @@ class MainWindow(QtWidgets.QMainWindow):
         except StopIteration:
             print(f"[MainWindow] on_rt_selected: idx {idx} not found in rows")
             return
-        row = self.rows[pos]
         block = self.blocks[pos]
         inp = self.inputs[pos]
 
         # update views; pass callback so signals can call back to select timeline
-        self.signals_tab.update_signals(self.rows, self.inputs, idx, on_select_callback=self.select_rt)
+        self.signals_tab.update_signals(
+            self.rows, self.inputs, idx, on_select_callback=self.select_rt
+        )
         self.context_tab.update_context(block)
         self.details_tab.update_details(inp, block)
         # update compare with full rows and selected idx

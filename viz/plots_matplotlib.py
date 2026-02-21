@@ -1,7 +1,9 @@
 # aaps_emulator/viz/plots_matplotlib.py
+from datetime import datetime
+
 import matplotlib.pyplot as plt
 import numpy as np
-from datetime import datetime
+
 
 def plot_error_heatmap(rows, bin_by="hour"):
     """
@@ -14,7 +16,9 @@ def plot_error_heatmap(rows, bin_by="hour"):
 
     # compute absolute error
     ts = np.array([r["ts_s"] for r in rows])
-    err = np.array([abs((r["aaps_eventual"] or 0) - (r["py_eventual"] or 0)) for r in rows])
+    err = np.array(
+        [abs((r["aaps_eventual"] or 0) - (r["py_eventual"] or 0)) for r in rows]
+    )
 
     # convert timestamps to datetime
     dt = [datetime.fromtimestamp(int(t)) for t in ts]
@@ -36,9 +40,16 @@ def plot_error_heatmap(rows, bin_by="hour"):
     cmap = plt.get_cmap("hot")
     norm = plt.Normalize(vmin=min(agg), vmax=max(agg) if max(agg) > 0 else 1)
     colors = [cmap(norm(v)) for v in agg]
-    ax.bar(range(len(uniq)), [1]*len(uniq), color=colors)
+    ax.bar(range(len(uniq)), [1] * len(uniq), color=colors)
     ax.set_xticks(range(len(uniq)))
-    ax.set_xticklabels([u.strftime("%Y-%m-%d %H:%M") if bin_by=="hour" else u.strftime("%Y-%m-%d") for u in uniq], rotation=45, ha="right")
+    ax.set_xticklabels(
+        [
+            u.strftime("%Y-%m-%d %H:%M") if bin_by == "hour" else u.strftime("%Y-%m-%d")
+            for u in uniq
+        ],
+        rotation=45,
+        ha="right",
+    )
     ax.set_yticks([])
     ax.set_title("Heatmap of |AAPS - PY| (aggregated)")
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)

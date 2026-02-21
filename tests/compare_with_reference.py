@@ -4,11 +4,14 @@ Compare python AutoISF outputs with reference CSV.
 Usage (from inside aaps_emulator):
   python -m tests.compare_with_reference --ref tests/reference.csv --logs logs
 """
-import csv
+
 import argparse
+import csv
 import math
+
 from analysis.compare_runner import run_compare_on_all_logs
 from core.autoisf_algorithm import determine_basal_autoisf
+
 
 def safe_float(s, default=0.0):
     if s is None:
@@ -24,6 +27,7 @@ def safe_float(s, default=0.0):
         except Exception:
             return default
 
+
 def safe_int(s, default=0):
     if s is None:
         return default
@@ -35,9 +39,10 @@ def safe_int(s, default=0):
     except Exception:
         return default
 
+
 def load_reference_csv(path):
     rows = {}
-    with open(path, newline='', encoding='utf-8') as f:
+    with open(path, newline="", encoding="utf-8") as f:
         r = csv.DictReader(f)
         for rec in r:
             idx_raw = rec.get("idx")
@@ -52,15 +57,17 @@ def load_reference_csv(path):
                 "aaps_eventual": safe_float(rec.get("aaps_eventual"), 0.0),
                 "aaps_rate": safe_float(rec.get("aaps_rate"), 0.0),
                 "aaps_duration": safe_int(rec.get("aaps_duration"), 0),
-                "aaps_insreq": safe_float(rec.get("aaps_insreq"), 0.0)
+                "aaps_insreq": safe_float(rec.get("aaps_insreq"), 0.0),
             }
     return rows
+
 
 def rmse(errors):
     if not errors:
         return 0.0
-    s = sum(e*e for e in errors)
+    s = sum(e * e for e in errors)
     return math.sqrt(s / len(errors))
+
 
 def main():
     p = argparse.ArgumentParser()
@@ -94,7 +101,7 @@ def main():
             meal_data=inp.get("meal"),
             rt=inp.get("rt"),
             auto_isf_consoleError=errs,
-            auto_isf_consoleLog=logs
+            auto_isf_consoleLog=logs,
         )
 
         py_ev = res.eventualBG if res.eventualBG is not None else None
@@ -110,7 +117,11 @@ def main():
 
         compared += 1
         try:
-            ev_err = float(py_ev) - float(ref_ev) if py_ev is not None else float(ref_ev) * -1.0
+            ev_err = (
+                float(py_ev) - float(ref_ev)
+                if py_ev is not None
+                else float(ref_ev) * -1.0
+            )
             ev_errors.append(ev_err)
             if abs(ev_err) <= 0.5:
                 within_tol += 1
@@ -137,7 +148,9 @@ def main():
     print(f"  RMSE insulinReq: {rmse(ins_errors)}")
 
     # Top 10 by absolute eventualBG error
-    ev_abs_sorted = sorted([(i, e) for i, e in enumerate(ev_errors)], key=lambda x: abs(x[1]), reverse=True)[:10]
+    ev_abs_sorted = sorted(
+        [(i, e) for i, e in enumerate(ev_errors)], key=lambda x: abs(x[1]), reverse=True
+    )[:10]
     print("\nTop 10 eventualBG errors:")
     # we need mapping from enumerate index to actual row idx; rebuild list of compared idxs
     compared_idxs = []
@@ -170,7 +183,7 @@ def main():
                     meal_data=inp.get("meal"),
                     rt=inp.get("rt"),
                     auto_isf_consoleError=errs,
-                    auto_isf_consoleLog=logs
+                    auto_isf_consoleLog=logs,
                 )
                 py_ev = res.eventualBG
             print(f" idx {real_idx}: ref {ref_ev} py {py_ev} err {err}")
@@ -178,7 +191,11 @@ def main():
             print(f" idx_pos {enum_idx} err {err}")
 
     # Top 10 by absolute rate error
-    rate_abs_sorted = sorted([(i, e) for i, e in enumerate(rate_errors)], key=lambda x: abs(x[1]), reverse=True)[:10]
+    rate_abs_sorted = sorted(
+        [(i, e) for i, e in enumerate(rate_errors)],
+        key=lambda x: abs(x[1]),
+        reverse=True,
+    )[:10]
     print("\nTop 10 rate errors (U/h):")
     for enum_idx, err in rate_abs_sorted:
         try:
@@ -188,7 +205,11 @@ def main():
             print(f" idx_pos {enum_idx} rate_err {err}")
 
     # Top 10 by absolute insulinReq error
-    ins_abs_sorted = sorted([(i, e) for i, e in enumerate(ins_errors)], key=lambda x: abs(x[1]), reverse=True)[:10]
+    ins_abs_sorted = sorted(
+        [(i, e) for i, e in enumerate(ins_errors)],
+        key=lambda x: abs(x[1]),
+        reverse=True,
+    )[:10]
     print("\nTop 10 insulinReq errors (U):")
     for enum_idx, err in ins_abs_sorted:
         try:

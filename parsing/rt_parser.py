@@ -1,5 +1,7 @@
 import re
+
 from aaps_emulator.parsing.utils import clean_num
+
 
 def parse_rt(rt_line):
     def get(name):
@@ -15,5 +17,5 @@ def parse_rt(rt_line):
         "duration": int(get("duration") or 0),
         "rate": get("rate"),
         "iob": get("IOB"),
-        "variable_sens": get("variable_sens")
+        "variable_sens": get("variable_sens"),
     }

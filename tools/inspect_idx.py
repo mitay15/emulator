@@ -4,10 +4,12 @@ Inspect inputs and AutoISF result for a single idx from logs.
 Usage (from inside aaps_emulator):
   python -m tools.inspect_idx --idx 11
 """
+
 import argparse
-import json
+
 from analysis.compare_runner import run_compare_on_all_logs
 from core.autoisf_algorithm import determine_basal_autoisf
+
 
 def main():
     p = argparse.ArgumentParser()
@@ -19,12 +21,28 @@ def main():
     for r, b, inp in zip(rows, blocks, inputs):
         if r["idx"] == args.idx:
             print("ROW:", r)
-            print("BLOCK (rt snippet):", {k: b.get(k) for k in ("rt",) if b.get(k) is not None})
+            print(
+                "BLOCK (rt snippet):",
+                {k: b.get(k) for k in ("rt",) if b.get(k) is not None},
+            )
             print("INPUT keys:", list(inp.keys()))
-            print("glucose_status:", getattr(inp.get('glucose_status'), '__dict__', str(inp.get('glucose_status'))))
-            print("autosens:", getattr(inp.get('autosens'), '__dict__', str(inp.get('autosens'))))
-            print("iob_array len:", len(inp.get('iob_array') or []))
-            print("profile:", getattr(inp.get('profile'), '__dict__', str(inp.get('profile'))))
+            print(
+                "glucose_status:",
+                getattr(
+                    inp.get("glucose_status"),
+                    "__dict__",
+                    str(inp.get("glucose_status")),
+                ),
+            )
+            print(
+                "autosens:",
+                getattr(inp.get("autosens"), "__dict__", str(inp.get("autosens"))),
+            )
+            print("iob_array len:", len(inp.get("iob_array") or []))
+            print(
+                "profile:",
+                getattr(inp.get("profile"), "__dict__", str(inp.get("profile"))),
+            )
 
             errs = []
             logs = []
@@ -37,13 +55,14 @@ def main():
                 meal_data=inp.get("meal"),
                 rt=inp.get("rt"),
                 auto_isf_consoleError=errs,
-                auto_isf_consoleLog=logs
+                auto_isf_consoleLog=logs,
             )
             print("AutoISF result:", res)
             print("Console logs:", logs)
             print("Console errors:", errs)
             return
     print("idx not found:", args.idx)
+
 
 if __name__ == "__main__":
     main()

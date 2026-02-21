@@ -7,12 +7,12 @@ from typing import List, Optional
 # -----------------------------
 @dataclass
 class GlucoseStatus:
-    glucose: float              # BG in mmol/L
-    delta: float                # 5m delta in mmol/L
-    short_avg_delta: float      # 15m delta
-    long_avg_delta: float       # 40m delta
-    date: int                   # timestamp (ms)
-    noise: float                # CGM noise level
+    glucose: float  # BG in mmol/L
+    delta: float  # 5m delta in mmol/L
+    short_avg_delta: float  # 15m delta
+    long_avg_delta: float  # 40m delta
+    date: int  # timestamp (ms)
+    noise: float  # CGM noise level
 
 
 # -----------------------------
@@ -20,9 +20,9 @@ class GlucoseStatus:
 # -----------------------------
 @dataclass
 class IobTotal:
-    iob: float                  # insulin on board (U)
-    activity: float             # insulin activity (U/min)
-    iob_with_zero_temp: Optional['IobTotal'] = None
+    iob: float  # insulin on board (U)
+    activity: float  # insulin activity (U/min)
+    iob_with_zero_temp: Optional["IobTotal"] = None
 
 
 # -----------------------------
@@ -30,9 +30,9 @@ class IobTotal:
 # -----------------------------
 @dataclass
 class MealData:
-    carbs: float                # total carbs entered (g)
-    meal_cob: float             # current COB (g)
-    last_carb_time: int         # timestamp (ms)
+    carbs: float  # total carbs entered (g)
+    meal_cob: float  # current COB (g)
+    last_carb_time: int  # timestamp (ms)
     slope_from_max_deviation: float
     slope_from_min_deviation: float
 
@@ -42,8 +42,8 @@ class MealData:
 # -----------------------------
 @dataclass
 class AutosensResult:
-    ratio: float = 1.0          # autosens multiplier (0.7–1.2)
-    sens_result: str = ""       # text info
+    ratio: float = 1.0  # autosens multiplier (0.7–1.2)
+    sens_result: str = ""  # text info
 
 
 # -----------------------------
@@ -51,9 +51,9 @@ class AutosensResult:
 # -----------------------------
 @dataclass
 class CurrentTemp:
-    duration: int               # minutes remaining
-    rate: float                 # U/hr
-    minutes_running: int        # how long temp basal has been running
+    duration: int  # minutes remaining
+    rate: float  # U/hr
+    minutes_running: int  # how long temp basal has been running
 
 
 # -----------------------------
@@ -110,7 +110,7 @@ class OapsProfileAutoIsf:
         smb_max_range_extension=None,
         maxSMBBasalMinutes=None,
         maxUAMSMBBasalMinutes=None,
-        variable_sens=None
+        variable_sens=None,
     ):
         self.min_bg = min_bg
         self.max_bg = max_bg

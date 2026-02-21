@@ -5,17 +5,19 @@ from typing import Optional
 
 @dataclass
 class GlucoseStatus:
-    glucose: float            # mmol/L
-    delta: float              # mmol/L per 5min
-    short_avg_delta: float    # mmol/L per 5min
-    long_avg_delta: float     # mmol/L per 5min
-    date: int                 # timestamp ms
+    glucose: float  # mmol/L
+    delta: float  # mmol/L per 5min
+    short_avg_delta: float  # mmol/L per 5min
+    long_avg_delta: float  # mmol/L per 5min
+    date: int  # timestamp ms
     noise: float
 
     def __str__(self):
-        return (f"GlucoseStatus(glucose={self.glucose:.2f} mmol/L, delta={self.delta:.2f}, "
-                f"shortAvgDelta={self.short_avg_delta:.2f}, longAvgDelta={self.long_avg_delta:.2f}, "
-                f"date={self.date}, noise={self.noise})")
+        return (
+            f"GlucoseStatus(glucose={self.glucose:.2f} mmol/L, delta={self.delta:.2f}, "
+            f"shortAvgDelta={self.short_avg_delta:.2f}, longAvgDelta={self.long_avg_delta:.2f}, "
+            f"date={self.date}, noise={self.noise})"
+        )
 
 
 @dataclass
@@ -37,8 +39,10 @@ class MealData:
     slope_from_min_deviation: float = 0.0
 
     def __str__(self):
-        return (f"MealData(carbs={self.carbs}, mealCOB={self.meal_cob}, "
-                f"lastCarbTime={self.last_carb_time})")
+        return (
+            f"MealData(carbs={self.carbs}, mealCOB={self.meal_cob}, "
+            f"lastCarbTime={self.last_carb_time})"
+        )
 
 
 @dataclass
@@ -97,5 +101,7 @@ class OapsProfileAutoIsf:
     enable_uam_flag: bool = False
 
     def __str__(self):
-        return (f"OapsProfileAutoIsf(target_bg={self.target_bg}, sens={self.sens}, "
-                f"carb_ratio={self.carb_ratio}, current_basal={self.current_basal})")
+        return (
+            f"OapsProfileAutoIsf(target_bg={self.target_bg}, sens={self.sens}, "
+            f"carb_ratio={self.carb_ratio}, current_basal={self.current_basal})"
+        )

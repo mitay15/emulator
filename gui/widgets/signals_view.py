@@ -1,16 +1,19 @@
 # aaps_emulator/gui/widgets/signals_view.py
-from PyQt6 import QtWidgets, QtCore, QtGui
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
-import matplotlib.dates as mdates
-import numpy as np
-from datetime import datetime
 import os
+from datetime import datetime
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from PyQt6 import QtCore, QtGui, QtWidgets
+
 
 class SignalsView(QtWidgets.QWidget):
     """
     Полный файл SignalsView с увеличенными кнопками и иконками.
     """
+
     def __init__(self):
         super().__init__()
         layout = QtWidgets.QVBoxLayout(self)
@@ -61,10 +64,12 @@ class SignalsView(QtWidgets.QWidget):
 
         # tooltip annotation (shared across axes)
         self._annot = self.axes[0].annotate(
-            "", xy=(0, 0), xytext=(15, 15),
+            "",
+            xy=(0, 0),
+            xytext=(15, 15),
             textcoords="offset points",
             bbox=dict(boxstyle="round", fc="w"),
-            arrowprops=dict(arrowstyle="->")
+            arrowprops=dict(arrowstyle="->"),
         )
         self._annot.set_visible(False)
 
@@ -80,7 +85,11 @@ class SignalsView(QtWidgets.QWidget):
 
         # timestamps and datetimes
         self._ts_all = [r.get("ts_s", 0) for r in rows]
-        dt = [datetime.fromtimestamp(int(t)) for t in self._ts_all] if self._ts_all else []
+        dt = (
+            [datetime.fromtimestamp(int(t)) for t in self._ts_all]
+            if self._ts_all
+            else []
+        )
 
         # signals arrays (safe extraction)
         bg = [inp["glucose_status"].glucose for inp in inputs]
@@ -98,11 +107,20 @@ class SignalsView(QtWidgets.QWidget):
             self.axes[0].plot(dt, bg, label="BG (mmol/L)", color="#00aaff", picker=5)
             self.axes[1].plot(dt, iob, label="IOB (U)", color="#ff66cc", picker=5)
             self.axes[2].plot(dt, cob, label="COB (g)", color="#ffb74d", picker=5)
-            self.axes[3].plot(dt, autosens, label="Autosens (ratio)", color="#ffd54f", picker=5)
+            self.axes[3].plot(
+                dt, autosens, label="Autosens (ratio)", color="#ffd54f", picker=5
+            )
             self.axes[4].plot(dt, isf, label="ISF (mmol/U)", color="#8bc34a", picker=5)
         else:
             for ax in self.axes:
-                ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
+                ax.text(
+                    0.5,
+                    0.5,
+                    "No data",
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
+                )
 
         # legends and grid
         for ax in self.axes:
@@ -111,13 +129,17 @@ class SignalsView(QtWidgets.QWidget):
 
         # format x-axis as date/time on bottom axis
         self.axes[-1].xaxis.set_major_locator(mdates.AutoDateLocator())
-        self.axes[-1].xaxis.set_major_formatter(mdates.ConciseDateFormatter(mdates.AutoDateLocator()))
+        self.axes[-1].xaxis.set_major_formatter(
+            mdates.ConciseDateFormatter(mdates.AutoDateLocator())
+        )
         self.axes[-1].set_xlabel("Дата / Время")
 
         # draw vertical cursor for selected_idx
         if self._selected_idx is not None and dt:
             try:
-                pos = next(i for i, r in enumerate(rows) if r["idx"] == self._selected_idx)
+                pos = next(
+                    i for i, r in enumerate(rows) if r["idx"] == self._selected_idx
+                )
                 x_sel = dt[pos]
                 for ax in self.axes:
                     ax.axvline(x_sel, color="#ff5252", linestyle="--", alpha=0.9)

@@ -1,5 +1,6 @@
 from PyQt6 import QtWidgets
 
+
 class ContextView(QtWidgets.QTextEdit):
     def __init__(self):
         super().__init__()

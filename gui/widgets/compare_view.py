@@ -1,15 +1,18 @@
 # aaps_emulator/gui/widgets/compare_view.py
-from PyQt6 import QtWidgets, QtCore, QtGui
+import os
+from datetime import datetime
+
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
-import matplotlib.dates as mdates
-from datetime import datetime
-import os
+from PyQt6 import QtCore, QtGui, QtWidgets
+
 
 class CompareView(QtWidgets.QWidget):
     """
     Полный файл CompareView с увеличенными кнопками и иконками.
     """
+
     def __init__(self):
         super().__init__()
         layout = QtWidgets.QVBoxLayout(self)
@@ -69,18 +72,31 @@ class CompareView(QtWidgets.QWidget):
         py = [r.get("py_eventual") or 0.0 for r in rows]
 
         self.ax.clear()
-        self.ax.plot(dt, aaps, label="AAPS eventualBG (mmol/L)", color="#1976d2", linewidth=2)
-        self.ax.plot(dt, py, label="PY eventualBG (mmol/L)", color="#ff9800", linewidth=2, linestyle="--")
+        self.ax.plot(
+            dt, aaps, label="AAPS eventualBG (mmol/L)", color="#1976d2", linewidth=2
+        )
+        self.ax.plot(
+            dt,
+            py,
+            label="PY eventualBG (mmol/L)",
+            color="#ff9800",
+            linewidth=2,
+            linestyle="--",
+        )
 
         self.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-        self.ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(mdates.AutoDateLocator()))
+        self.ax.xaxis.set_major_formatter(
+            mdates.ConciseDateFormatter(mdates.AutoDateLocator())
+        )
         self.ax.set_xlabel("Дата / Время")
         self.ax.set_ylabel("eventualBG (mmol/L)")
         self.ax.legend()
         self.ax.grid(alpha=0.25)
 
         if self._selected_idx is not None:
-            pos = next((i for i, r in enumerate(rows) if r["idx"] == self._selected_idx), None)
+            pos = next(
+                (i for i, r in enumerate(rows) if r["idx"] == self._selected_idx), None
+            )
             if pos is not None:
                 x_sel = dt[pos]
                 if self._vline:
@@ -94,13 +110,17 @@ class CompareView(QtWidgets.QWidget):
                     except Exception:
                         pass
 
-                self._vline = self.ax.axvline(x_sel, color="#d32f2f", linestyle="--", linewidth=1.5, alpha=0.9)
+                self._vline = self.ax.axvline(
+                    x_sel, color="#d32f2f", linestyle="--", linewidth=1.5, alpha=0.9
+                )
                 txt = f"#{self._selected_idx}\nAAPS {aaps[pos]:.2f}\nPY {py[pos]:.2f}"
                 y_top = max(max(aaps), max(py)) if aaps and py else 0
                 self._annot = self.ax.annotate(
-                    txt, xy=(x_sel, y_top),
-                    xytext=(10, -30), textcoords="offset points",
-                    bbox=dict(boxstyle="round", fc="w", alpha=0.9)
+                    txt,
+                    xy=(x_sel, y_top),
+                    xytext=(10, -30),
+                    textcoords="offset points",
+                    bbox=dict(boxstyle="round", fc="w", alpha=0.9),
                 )
 
         self.fig.tight_layout()

@@ -5,5 +5,5 @@ def clean_num(s):
     s = s.rstrip(".")
     try:
         return float(s)
-    except:
+    except ValueError:
         return None

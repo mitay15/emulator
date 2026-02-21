@@ -18,16 +18,16 @@
 - compute_autosens_ratio(history_points, window_minutes=180, min_points=4, clip=(0.7,1.3))
 """
 
-from typing import List, Dict, Optional
-import statistics
 import math
-from datetime import datetime
+import statistics
+from typing import Dict, List, Optional
+
 
 def compute_autosens_ratio(
     history_points: List[Dict],
     window_minutes: int = 180,
     min_points: int = 4,
-    clip: Optional[tuple] = (0.7, 1.3)
+    clip: Optional[tuple] = (0.7, 1.3),
 ) -> float:
     """
     history_points: список словарей, каждый должен содержать:

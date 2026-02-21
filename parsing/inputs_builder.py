@@ -1,9 +1,13 @@
+from aaps_emulator.core.autoisf_structs import OapsProfileAutoIsf
 from aaps_emulator.parsing.context_parsers import (
-    parse_glucose_status, parse_current_temp, parse_iob_history,
-    parse_profile, parse_autosens, parse_meal
+    parse_autosens,
+    parse_current_temp,
+    parse_glucose_status,
+    parse_iob_history,
+    parse_meal,
+    parse_profile,
 )
 from aaps_emulator.parsing.rt_parser import parse_rt
-from aaps_emulator.core.autoisf_structs import OapsProfileAutoIsf
 
 
 def build_inputs(block):
@@ -64,7 +68,7 @@ def build_inputs(block):
             smb_delivery_ratio_bg_range=0.0,
             smb_max_range_extension=1.0,
             autoISF_version="3.0.1",
-            variable_sens=6.0
+            variable_sens=6.0,
         )
 
     return {
@@ -74,5 +78,5 @@ def build_inputs(block):
         "profile": prof,
         "autosens": autosens,
         "meal": meal,
-        "rt": rt
+        "rt": rt,
     }

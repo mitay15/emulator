@@ -1,6 +1,8 @@
 # aaps_emulator/gui/widgets/timeline_view.py
-from PyQt6 import QtWidgets, QtCore, QtGui
 from datetime import datetime
+
+from PyQt6 import QtCore, QtGui, QtWidgets
+
 
 class TimelineView(QtWidgets.QWidget):
     rt_selected = QtCore.pyqtSignal(int)  # emits global idx
@@ -28,7 +30,9 @@ class TimelineView(QtWidgets.QWidget):
         # the actual list
         self.list = QtWidgets.QListWidget()
         self.list.currentRowChanged.connect(self._on_row_changed)
-        self.list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.list.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
+        )
         v.addWidget(self.list)
 
         # internal state
@@ -105,7 +109,7 @@ class TimelineView(QtWidgets.QWidget):
 
             aaps_ev = row.get("aaps_eventual", 0.0) or 0.0
             py_ev = row.get("py_eventual", 0.0) or 0.0
-            item_text = f"#{idx}  {ts_str}  AAPS {aaps_ev:.2f}  PY {py_ev:.2f}  [{row.get('zip_name','')}]"
+            item_text = f"#{idx}  {ts_str}  AAPS {aaps_ev:.2f}  PY {py_ev:.2f}  [{row.get('zip_name', '')}]"
             item = QtWidgets.QListWidgetItem(item_text)
 
             inp = self._inputs[pos] if pos < len(self._inputs) else None
@@ -138,8 +142,12 @@ class TimelineView(QtWidgets.QWidget):
             return
         except ValueError:
             # not visible — try to insert it at top of list (make visible)
-            print(f"[TimelineView] select_by_idx: idx {idx} not visible, making it visible")
-            all_indices = [idx] + [i for i in (r["idx"] for r in self._all_rows) if i != idx]
+            print(
+                f"[TimelineView] select_by_idx: idx {idx} not visible, making it visible"
+            )
+            all_indices = [idx] + [
+                i for i in (r["idx"] for r in self._all_rows) if i != idx
+            ]
             self._rebuild_items(all_indices)
             self.list.setCurrentRow(0)
             return

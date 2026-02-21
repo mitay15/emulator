@@ -1,14 +1,14 @@
 # aaps_emulator/analysis/compare_runner.py
 import os
 import re
+
+from aaps_emulator.core.autoisf_algorithm import determine_basal_autoisf
+from aaps_emulator.parsing.inputs_builder import build_inputs
 from aaps_emulator.parsing.log_loader import (
-    find_all_zip_logs,
     extract_zip,
+    find_all_zip_logs,
     load_log_blocks,
 )
-
-from aaps_emulator.parsing.inputs_builder import build_inputs
-from aaps_emulator.core.autoisf_algorithm import determine_basal_autoisf
 
 
 def run_compare_on_all_logs(logs_dir="logs"):
@@ -56,7 +56,7 @@ def run_compare_on_all_logs(logs_dir="logs"):
                     smb_max_range_extension=1.0,
                     iob_threshold_percent=100,
                     auto_isf_consoleError=[],
-                    auto_isf_consoleLog=[]
+                    auto_isf_consoleLog=[],
                 )
 
                 # parse timestamp from RT line (ms -> s)
@@ -74,7 +74,7 @@ def run_compare_on_all_logs(logs_dir="logs"):
                     "aaps_duration": inputs["rt"].get("duration"),
                     "py_duration": result.duration,
                     "aaps_insreq": inputs["rt"].get("insulinReq"),
-                    "py_insreq": result.insulinReq
+                    "py_insreq": result.insulinReq,
                 }
 
                 all_rows.append(row)

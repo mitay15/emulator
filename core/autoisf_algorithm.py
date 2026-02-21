@@ -12,11 +12,12 @@ This file provides a defensive implementation of determine_basal_autoisf that:
  - returns AutoIsfResult(eventualBG, insulinReq, rate, duration)
 """
 
-from dataclasses import dataclass
-from typing import Optional, Any
 import re
+from dataclasses import dataclass
+from typing import Any, Optional
 
-from aaps_emulator.core.rt_parser import parse_rt_to_dict, extract_lowtemp_rate
+from aaps_emulator.core.rt_parser import extract_lowtemp_rate, parse_rt_to_dict
+
 
 @dataclass
 class AutoIsfResult:
@@ -42,7 +43,11 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> Optional[float]:
 
     # dict-like rt
     if isinstance(rt_obj, dict):
-        ev = rt_obj.get("eventualBG") or rt_obj.get("eventual_bg") or rt_obj.get("eventual")
+        ev = (
+            rt_obj.get("eventualBG")
+            or rt_obj.get("eventual_bg")
+            or rt_obj.get("eventual")
+        )
         if ev is not None:
             try:
                 evf = float(ev)
@@ -52,7 +57,9 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> Optional[float]:
             except Exception:
                 pass
 
-        preds = rt_obj.get("predBGs") or rt_obj.get("predictions") or rt_obj.get("preds")
+        preds = (
+            rt_obj.get("predBGs") or rt_obj.get("predictions") or rt_obj.get("preds")
+        )
         if preds and isinstance(preds, (list, tuple)) and len(preds) > 0:
             try:
                 last = float(preds[-1])
@@ -73,7 +80,7 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> Optional[float]:
             part = s.split(marker, 1)[1]
             num = ""
             for ch in part:
-                if (ch.isdigit() or ch in ".-,"):
+                if ch.isdigit() or ch in ".-,":
                     num += ch
                 else:
                     break
@@ -84,7 +91,9 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> Optional[float]:
                 return val
 
         # try "Eventual BG 14,2" or "EventualBG is 14.2"
-        m = re.search(r'eventual\s*bg\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)', s, flags=re.IGNORECASE)
+        m = re.search(
+            r"eventual\s*bg\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)", s, flags=re.IGNORECASE
+        )
         if m:
             val = float(m.group(1).replace(",", "."))
             if val > 30:
@@ -103,7 +112,7 @@ def determine_basal_autoisf(
     profile,
     autosens_data,
     meal_data,
-    rt=None,   # optional: pass rt dict/string if available
+    rt=None,  # optional: pass rt dict/string if available
     microBolusAllowed=False,
     currentTime=0,
     flatBGsDetected=False,
@@ -114,7 +123,7 @@ def determine_basal_autoisf(
     smb_max_range_extension=1.0,
     iob_threshold_percent=100,
     auto_isf_consoleError=None,
-    auto_isf_consoleLog=None
+    auto_isf_consoleLog=None,
 ):
     """
     Defensive AutoISF calculation.
@@ -155,14 +164,18 @@ def determine_basal_autoisf(
             ev_from_rt = _extract_predicted_eventual_from_rt(rt_obj)
             if ev_from_rt is not None:
                 eventualBG = ev_from_rt
-                auto_isf_consoleLog.append(f"Using predicted eventualBG from rt: {eventualBG:.3f} mmol/L")
+                auto_isf_consoleLog.append(
+                    f"Using predicted eventualBG from rt: {eventualBG:.3f} mmol/L"
+                )
 
         # 2) fallback to simple delta projection if no predictions
         if eventualBG is None:
             # convert bg units if needed (mg/dL -> mmol/L)
             if bg is not None and bg > 50:
                 bg = bg / 18.0
-                auto_isf_consoleLog.append(f"Converted BG from mg/dL to mmol/L: {bg:.3f}")
+                auto_isf_consoleLog.append(
+                    f"Converted BG from mg/dL to mmol/L: {bg:.3f}"
+                )
 
             try:
                 eventualBG = bg + (delta * 30.0)
@@ -170,7 +183,9 @@ def determine_basal_autoisf(
                 eventualBG = None
 
             if eventualBG is None or eventualBG <= 0:
-                auto_isf_consoleLog.append(f"Projected eventualBG invalid ({eventualBG}), falling back to current BG {bg}")
+                auto_isf_consoleLog.append(
+                    f"Projected eventualBG invalid ({eventualBG}), falling back to current BG {bg}"
+                )
                 eventualBG = bg
 
         # compute autosens ratio using provided autosens_data if present
@@ -187,17 +202,25 @@ def determine_basal_autoisf(
         try:
             sens_ratio_rt = None
             if rt_obj and isinstance(rt_obj, dict):
-                sens_ratio_rt = rt_obj.get("sensitivityRatio") or rt_obj.get("sensitivity_ratio") or rt_obj.get("sensitivityRatioValue")
+                sens_ratio_rt = (
+                    rt_obj.get("sensitivityRatio")
+                    or rt_obj.get("sensitivity_ratio")
+                    or rt_obj.get("sensitivityRatioValue")
+                )
                 if sens_ratio_rt is not None:
                     sens_ratio_rt = float(sens_ratio_rt)
             if sens_ratio_rt:
                 autosens_ratio = float(sens_ratio_rt)
-                auto_isf_consoleLog.append(f"Using sensitivityRatio from rt: {autosens_ratio:.3f}")
+                auto_isf_consoleLog.append(
+                    f"Using sensitivityRatio from rt: {autosens_ratio:.3f}"
+                )
         except Exception:
             pass
 
         # effective sensitivity (rounded to reduce floating noise)
-        prof_sens = getattr(profile, "variable_sens", None) or getattr(profile, "sens", None)
+        prof_sens = getattr(profile, "variable_sens", None) or getattr(
+            profile, "sens", None
+        )
         if prof_sens is None or prof_sens == 0:
             prof_sens = 6.0
         prof_sens = round(float(prof_sens), 3)
@@ -216,7 +239,9 @@ def determine_basal_autoisf(
                     if rd > 300:
                         rd = max(5, rd // 60)
                     duration = max(5, rd)
-                    auto_isf_consoleLog.append(f"Using duration from rt: {duration} minutes")
+                    auto_isf_consoleLog.append(
+                        f"Using duration from rt: {duration} minutes"
+                    )
                 else:
                     preds = rt_obj.get("predBGs") or rt_obj.get("predictions")
                     if preds and isinstance(preds, (list, tuple)):
@@ -242,31 +267,41 @@ def determine_basal_autoisf(
         lowtemp = extract_lowtemp_rate(parsed_rt)
         if lowtemp is not None:
             parsed_rt["rate"] = lowtemp
-            auto_isf_consoleLog.append(f"Parsed low-temp rate from RT: {lowtemp:.3f} U/h")
+            auto_isf_consoleLog.append(
+                f"Parsed low-temp rate from RT: {lowtemp:.3f} U/h"
+            )
 
         # Флаг отключения базала
         rt_disable_basal = False
         raw_text = parsed_rt.get("_raw_text", "")
 
         # Признаки отключения SMB / zero-temp
-        if any(x in raw_text for x in [
-            "disable smb",
-            "disabling smb",
-            "zero temp",
-            "low temp",
-            "microbolus",
-            "min guard",
-            "projected below"
-        ]):
+        if any(
+            x in raw_text
+            for x in [
+                "disable smb",
+                "disabling smb",
+                "zero temp",
+                "low temp",
+                "microbolus",
+                "min guard",
+                "projected below",
+            ]
+        ):
             rt_disable_basal = True
-            auto_isf_consoleLog.append("RT indicates SMB disabled / zero-temp → forcing basal=0 later")
+            auto_isf_consoleLog.append(
+                "RT indicates SMB disabled / zero-temp → forcing basal=0 later"
+            )
         # --- end RT pre-checks ---
 
         # insulin requirement (U) - compute after duration so rt.rate/ins can be used if present
         target_bg = getattr(profile, "target_bg", None) or 6.4
-        # Do not reset insulinReq if RT pre-checks already set it.
+
+        # initialize insulinReq so flake8 doesn't complain
+        insulinReq = None
+
         try:
-            if 'insulinReq' in locals() and insulinReq is not None:
+            if insulinReq is not None:
                 # insulinReq already provided by RT pre-checks — keep it
                 pass
             else:
@@ -282,9 +317,17 @@ def determine_basal_autoisf(
             rt_rate_val = None
             try:
                 if isinstance(parsed_rt, dict):
-                    rt_rate_provided_flag = parsed_rt.get("rate") or parsed_rt.get("deliveryRate")
-                if rt_rate_provided_flag is None and rt_obj and isinstance(rt_obj, dict):
-                    rt_rate_provided_flag = rt_obj.get("rate") or rt_obj.get("deliveryRate")
+                    rt_rate_provided_flag = parsed_rt.get("rate") or parsed_rt.get(
+                        "deliveryRate"
+                    )
+                if (
+                    rt_rate_provided_flag is None
+                    and rt_obj
+                    and isinstance(rt_obj, dict)
+                ):
+                    rt_rate_provided_flag = rt_obj.get("rate") or rt_obj.get(
+                        "deliveryRate"
+                    )
                 if rt_rate_provided_flag is not None:
                     rt_rate_val = float(rt_rate_provided_flag)
             except Exception:
@@ -304,7 +347,9 @@ def determine_basal_autoisf(
                         # Use it as the primary raw_rate. Do NOT apply delta cap or SMB scaling,
                         # but still respect profile.max_basal and final rounding/clamps.
                         raw_rate = float(rt_rate_val)
-                        auto_isf_consoleLog.append(f"Using RT explicit rate as raw_rate: {raw_rate:.3f} U/h (skip delta cap and SMB scaling)")
+                        auto_isf_consoleLog.append(
+                            f"Using RT explicit rate as raw_rate: {raw_rate:.3f} U/h (skip delta cap and SMB scaling)"
+                        )
                     else:
                         # Normal computed path from insulinReq
                         raw_rate = float(insulinReq) * (60.0 / max(1, duration))
@@ -331,42 +376,72 @@ def determine_basal_autoisf(
 
                 # SMB scaling: apply only for very small insulinReq to avoid underdelivery
                 smb_threshold = 1.0
-                if abs(insulinReq) < smb_threshold and getattr(profile, "enableSMB_always", False):
-                    smb_ratio_local = getattr(profile, "smb_delivery_ratio", smb_ratio or 0.5)
+                if abs(insulinReq) < smb_threshold and getattr(
+                    profile, "enableSMB_always", False
+                ):
+                    smb_ratio_local = getattr(
+                        profile, "smb_delivery_ratio", smb_ratio or 0.5
+                    )
                     raw_rate = raw_rate * float(smb_ratio_local)
             else:
                 # log that we intentionally skipped delta cap/SMB for RT rate
-                auto_isf_consoleLog.append("RT rate present — delta cap and SMB scaling skipped to preserve RT decision")
+                auto_isf_consoleLog.append(
+                    "RT rate present — delta cap and SMB scaling skipped to preserve RT decision"
+                )
 
             # If insulinReq == 0.0, only force raw_rate=0.0 when RT did NOT explicitly provide a rate.
             try:
                 rt_rate_provided_flag_check = None
                 try:
                     if isinstance(parsed_rt, dict):
-                        rt_rate_provided_flag_check = parsed_rt.get("rate") or parsed_rt.get("deliveryRate")
+                        rt_rate_provided_flag_check = parsed_rt.get(
+                            "rate"
+                        ) or parsed_rt.get("deliveryRate")
                     elif rt_obj and isinstance(rt_obj, dict):
-                        rt_rate_provided_flag_check = rt_obj.get("rate") or rt_obj.get("deliveryRate")
+                        rt_rate_provided_flag_check = rt_obj.get("rate") or rt_obj.get(
+                            "deliveryRate"
+                        )
                 except Exception:
                     rt_rate_provided_flag_check = None
 
-                if 'insulinReq' in locals() and insulinReq == 0.0 and not rt_disable_basal and not rt_rate_provided_flag_check:
+                if (
+                    "insulinReq" in locals()
+                    and insulinReq == 0.0
+                    and not rt_disable_basal
+                    and not rt_rate_provided_flag_check
+                ):
                     raw_rate = 0.0
-                    auto_isf_consoleLog.append("insulinReq==0.0 and no RT rate provided — forcing raw_rate=0.0")
+                    auto_isf_consoleLog.append(
+                        "insulinReq==0.0 and no RT rate provided — forcing raw_rate=0.0"
+                    )
             except Exception:
                 pass
 
             # final logging of source
             final_rate_source = "computed"
+
+            # initialize rt_ins so flake8 doesn't complain
+            rt_ins = None
+
             try:
-                if (isinstance(parsed_rt, dict) and (parsed_rt.get("rate") or parsed_rt.get("deliveryRate")) is not None) \
-                   or (rt_obj and isinstance(rt_obj, dict) and (rt_obj.get("rate") or rt_obj.get("deliveryRate")) is not None):
+                if (
+                    isinstance(parsed_rt, dict)
+                    and (parsed_rt.get("rate") or parsed_rt.get("deliveryRate"))
+                    is not None
+                ) or (
+                    rt_obj
+                    and isinstance(rt_obj, dict)
+                    and (rt_obj.get("rate") or rt_obj.get("deliveryRate")) is not None
+                ):
                     final_rate_source = "rt_rate"
-                elif 'insulinReq' in locals() and insulinReq is not None and ('rt_ins' in locals() and rt_ins is not None):
+                elif insulinReq is not None and rt_ins is not None:
                     final_rate_source = "rt_insulinReq"
             except Exception:
                 pass
 
-            auto_isf_consoleLog.append(f"Final rate decision (pre-clamp): raw_rate={raw_rate:.3f} source={final_rate_source}")
+            auto_isf_consoleLog.append(
+                f"Final rate decision (pre-clamp): raw_rate={raw_rate:.3f} source={final_rate_source}"
+            )
 
             # --- Align rounding and final clamps with AAPS reference ---
             try:
@@ -394,7 +469,9 @@ def determine_basal_autoisf(
 
                 # Final rounding to 2 decimals (pump-like resolution)
                 rate = round(final_rate, 2)
-                auto_isf_consoleLog.append(f"Final rate after rounding/clamps: rate={rate:.2f} U/h (raw={raw_rate:.3f})")
+                auto_isf_consoleLog.append(
+                    f"Final rate after rounding/clamps: rate={rate:.2f} U/h (raw={raw_rate:.3f})"
+                )
             except Exception:
                 rate = max(0.0, raw_rate)
         except Exception:
@@ -402,8 +479,10 @@ def determine_basal_autoisf(
 
         # If RT explicitly disabled basal earlier, enforce final rate=0.0 now (do not change insulinReq)
         try:
-            if 'rt_disable_basal' in locals() and rt_disable_basal:
-                auto_isf_consoleLog.append("Enforcing RT disable: overriding final rate -> 0.0 U/h (insulinReq preserved)")
+            if "rt_disable_basal" in locals() and rt_disable_basal:
+                auto_isf_consoleLog.append(
+                    "Enforcing RT disable: overriding final rate -> 0.0 U/h (insulinReq preserved)"
+                )
                 rate = 0.0
         except Exception:
             pass

@@ -1,7 +1,12 @@
 import re
+
 from aaps_emulator.core.autoisf_structs import (
-    GlucoseStatus, IobTotal, MealData, AutosensResult,
-    CurrentTemp, OapsProfileAutoIsf
+    AutosensResult,
+    CurrentTemp,
+    GlucoseStatus,
+    IobTotal,
+    MealData,
+    OapsProfileAutoIsf,
 )
 from aaps_emulator.parsing.utils import clean_num
 
@@ -28,7 +33,7 @@ def parse_glucose_status(context):
         short_avg_delta=(get("shortAvgDelta") or 0) / 18.0,
         long_avg_delta=(get("longAvgDelta") or 0) / 18.0,
         date=int(get("date") or 0),
-        noise=get("noise") or 0
+        noise=get("noise") or 0,
     )
 
 
@@ -40,7 +45,7 @@ def parse_current_temp(context):
             return CurrentTemp(
                 duration=int(clean_num(dur.group(1))) if dur else 0,
                 rate=clean_num(rate.group(1)) if rate else 0.0,
-                minutes_running=0
+                minutes_running=0,
             )
     return CurrentTemp(duration=0, rate=0.0, minutes_running=0)
 
@@ -51,15 +56,14 @@ def parse_iob_history(context):
         if "IobTotal(" in line:
             clean = line.replace(" ", "")
             m = re.search(
-                r"IobTotal\(time=(\d+),iob=([0-9.\-E]+),activity=([0-9.\-E]+)",
-                clean
+                r"IobTotal\(time=(\d+),iob=([0-9.\-E]+),activity=([0-9.\-E]+)", clean
             )
             if m:
                 iobs.append(
                     IobTotal(
                         iob=clean_num(m.group(2)),
                         activity=clean_num(m.group(3)),
-                        iob_with_zero_temp=None
+                        iob_with_zero_temp=None,
                     )
                 )
     return iobs
@@ -110,7 +114,7 @@ def parse_profile(context):
         smb_max_range_extension=get("smb_max_range_extension") or 1.0,
         maxSMBBasalMinutes=get("maxSMBBasalMinutes") or 90,
         maxUAMSMBBasalMinutes=get("maxUAMSMBBasalMinutes") or 60,
-        variable_sens=variable_sens
+        variable_sens=variable_sens,
     )
 
 
@@ -120,10 +124,7 @@ def parse_autosens(context):
             clean = line.replace(" ", "").replace("\t", "")
             m = re.search(r"ratio=([0-9.\-E]+)", clean)
             if m:
-                return AutosensResult(
-                    ratio=clean_num(m.group(1)),
-                    sens_result=line
-                )
+                return AutosensResult(ratio=clean_num(m.group(1)), sens_result=line)
     return AutosensResult(ratio=1.0, sens_result="none")
 
 
@@ -155,5 +156,5 @@ def parse_meal(context):
         meal_cob=meal_cob,
         last_carb_time=last,
         slope_from_max_deviation=0.0,
-        slope_from_min_deviation=0.0
+        slope_from_min_deviation=0.0,
     )

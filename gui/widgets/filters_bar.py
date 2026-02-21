@@ -1,5 +1,6 @@
 # aaps_emulator/gui/widgets/filters_bar.py
-from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6 import QtCore, QtGui, QtWidgets
+
 
 class FiltersBar(QtWidgets.QWidget):
     filters_changed = QtCore.pyqtSignal(dict)
@@ -12,13 +13,19 @@ class FiltersBar(QtWidgets.QWidget):
 
         # checkboxes with clear labels and tooltips
         self.cb_autoisf = QtWidgets.QCheckBox("Показывать только AutoISF")
-        self.cb_autoisf.setToolTip("Показывать только RT, где AutoISF был активен (autosens.ratio != 1.0)")
+        self.cb_autoisf.setToolTip(
+            "Показывать только RT, где AutoISF был активен (autosens.ratio != 1.0)"
+        )
 
         self.cb_smb = QtWidgets.QCheckBox("Показывать только SMB")
-        self.cb_smb.setToolTip("Показывать только RT, где есть SMB (heuristic: insulinReq > 0)")
+        self.cb_smb.setToolTip(
+            "Показывать только RT, где есть SMB (heuristic: insulinReq > 0)"
+        )
 
         self.cb_high_delta = QtWidgets.QCheckBox("Показывать только High Δ")
-        self.cb_high_delta.setToolTip("Показывать только RT с большой скоростью изменения глюкозы (|Δ| ≥ 0.5 mmol/L)")
+        self.cb_high_delta.setToolTip(
+            "Показывать только RT с большой скоростью изменения глюкозы (|Δ| ≥ 0.5 mmol/L)"
+        )
 
         layout.addWidget(self.cb_autoisf)
         layout.addWidget(self.cb_smb)
@@ -28,7 +35,9 @@ class FiltersBar(QtWidgets.QWidget):
         layout.addWidget(QtWidgets.QLabel("Фильтр ZIP:"))
         self.zip_input = QtWidgets.QLineEdit()
         self.zip_input.setPlaceholderText("часть имени zip-файла")
-        self.zip_input.setToolTip("Введите часть имени ZIP-файла (регистронезависимо), чтобы показать только записи из этого архива")
+        self.zip_input.setToolTip(
+            "Введите часть имени ZIP-файла (регистронезависимо), чтобы показать только записи из этого архива"
+        )
         self.zip_input.setFixedWidth(220)
         layout.addWidget(self.zip_input)
 
@@ -47,14 +56,18 @@ class FiltersBar(QtWidgets.QWidget):
         layout.addWidget(QtWidgets.QLabel("С:"))
         self.time_from = QtWidgets.QDateTimeEdit()
         self.time_from.setCalendarPopup(True)
-        self.time_from.setToolTip("Начало временного диапазона (используется только если включён флажок)")
+        self.time_from.setToolTip(
+            "Начало временного диапазона (используется только если включён флажок)"
+        )
         self.time_from.setFixedWidth(160)
         layout.addWidget(self.time_from)
 
         layout.addWidget(QtWidgets.QLabel("По:"))
         self.time_to = QtWidgets.QDateTimeEdit()
         self.time_to.setCalendarPopup(True)
-        self.time_to.setToolTip("Конец временного диапазона (используется только если включён флажок)")
+        self.time_to.setToolTip(
+            "Конец временного диапазона (используется только если включён флажок)"
+        )
         self.time_to.setFixedWidth(160)
         layout.addWidget(self.time_to)
 
@@ -104,6 +117,7 @@ class FiltersBar(QtWidgets.QWidget):
 
     def _icon_path(self, name):
         import os
+
         base = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "icons"))
         return os.path.join(base, name)
 
@@ -133,7 +147,7 @@ class FiltersBar(QtWidgets.QWidget):
             "smb": self.cb_smb.isChecked(),
             "high_delta": self.cb_high_delta.isChecked(),
             "zip_name": self.zip_input.text().strip() or None,
-            "time_range": None
+            "time_range": None,
         }
 
         if self.cb_time_enable.isChecked():

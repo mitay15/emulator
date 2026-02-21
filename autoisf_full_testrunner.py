@@ -4,23 +4,25 @@
 #  Автор: Copilot + Димас
 # ============================================================
 
+import csv
 import os
 import re
 import zipfile
-import json
-import csv
-from datetime import datetime
 
-from autoisf_structs import (
-    GlucoseStatus, IobTotal, MealData, AutosensResult,
-    CurrentTemp, OapsProfileAutoIsf
-)
 from autoisf_algorithm import determine_basal_autoisf
-
+from autoisf_structs import (
+    AutosensResult,
+    CurrentTemp,
+    GlucoseStatus,
+    IobTotal,
+    MealData,
+    OapsProfileAutoIsf,
+)
 
 # ============================================================
 #  УТИЛИТЫ
 # ============================================================
+
 
 def clean_num(s):
     if s is None:
@@ -29,7 +31,7 @@ def clean_num(s):
     s = s.rstrip(".")
     try:
         return float(s)
-    except:
+    except ValueError:
         return None
 
 
@@ -52,6 +54,7 @@ def extract_zip(zip_path, out_dir="logs_extracted"):
 # ============================================================
 #  ЧТЕНИЕ ЛОГА И РАЗБИЕНИЕ НА RT-БЛОКИ
 # ============================================================
+
 
 def load_log_blocks(filepath):
     """
@@ -77,10 +80,7 @@ def load_log_blocks(filepath):
             rt_text = line.strip()
 
             # сохраняем блок
-            blocks.append({
-                "context": current_context,
-                "rt": rt_text
-            })
+            blocks.append({"context": current_context, "rt": rt_text})
 
             # начинаем новый контекст
             current_context = []
@@ -88,9 +88,12 @@ def load_log_blocks(filepath):
             current_context.append(line.rstrip("\n"))
 
     return blocks
+
+
 # ============================================================
 #  ПАРСЕРЫ КОНТЕКСТА
 # ============================================================
+
 
 def parse_glucose_status(context):
     gs_line = None
@@ -116,10 +119,8 @@ def parse_glucose_status(context):
         short_avg_delta=(get("shortAvgDelta") or 0) / 18.0,
         long_avg_delta=(get("longAvgDelta") or 0) / 18.0,
         date=int(get("date") or 0),
-        noise=get("noise") or 0
+        noise=get("noise") or 0,
     )
-
-
 
 
 def parse_current_temp(context):
@@ -134,7 +135,7 @@ def parse_current_temp(context):
             return CurrentTemp(
                 duration=int(clean_num(dur.group(1))) if dur else 0,
                 rate=clean_num(rate.group(1)) if rate else 0.0,
-                minutes_running=0
+                minutes_running=0,
             )
     return CurrentTemp(duration=0, rate=0.0, minutes_running=0)
 
@@ -146,15 +147,14 @@ def parse_iob_history(context):
         if "IobTotal(" in line:
             clean = line.replace(" ", "")
             m = re.search(
-                r"IobTotal\(time=(\d+),iob=([0-9.\-E]+),activity=([0-9.\-E]+)",
-                clean
+                r"IobTotal\(time=(\d+),iob=([0-9.\-E]+),activity=([0-9.\-E]+)", clean
             )
             if m:
                 iobs.append(
                     IobTotal(
                         iob=clean_num(m.group(2)),
                         activity=clean_num(m.group(3)),
-                        iob_with_zero_temp=None
+                        iob_with_zero_temp=None,
                     )
                 )
 
@@ -187,8 +187,6 @@ def parse_profile(context):
             return None
         return clean_num(m.group(1).rstrip(","))
 
-
-
     # 4. Собираем профиль
 
     # Сначала вычисляем variable_sens
@@ -210,27 +208,22 @@ def parse_profile(context):
         max_daily_basal=get("max_daily_basal") or 2.0,
         max_iob=get("max_iob") or 10,
         autosens_max=get("autosens_max") or 1.2,
-
         enable_uam="enableUAM=true" in prof_line,
         enableSMB_always="enableSMB_always=true" in prof_line,
         enableSMB_with_COB="enableSMB_with_COB=true" in prof_line,
         enableSMB_after_carbs="enableSMB_after_carbs=true" in prof_line,
         enableSMB_with_temptarget="enableSMB_with_temptarget=true" in prof_line,
         allowSMB_with_high_temptarget="allowSMB_with_high_temptarget=true" in prof_line,
-
         SMBInterval=get("SMBInterval") or 5,
         smb_delivery_ratio=get("smb_delivery_ratio") or 0.5,
         smb_delivery_ratio_min=get("smb_delivery_ratio_min") or 0.5,
         smb_delivery_ratio_max=get("smb_delivery_ratio_max") or 0.6,
         smb_delivery_ratio_bg_range=get("smb_delivery_ratio_bg_range") or 0.0,
         smb_max_range_extension=get("smb_max_range_extension") or 1.0,
-
         maxSMBBasalMinutes=get("maxSMBBasalMinutes") or 90,
         maxUAMSMBBasalMinutes=get("maxUAMSMBBasalMinutes") or 60,
-
-        variable_sens=variable_sens
+        variable_sens=variable_sens,
     )
-
 
 
 def parse_autosens(context):
@@ -245,15 +238,10 @@ def parse_autosens(context):
             clean = line.replace(" ", "").replace("\t", "")
             m = re.search(r"ratio=([0-9.\-E]+)", clean)
             if m:
-                return AutosensResult(
-                    ratio=clean_num(m.group(1)),
-                    sens_result=line
-                )
+                return AutosensResult(ratio=clean_num(m.group(1)), sens_result=line)
 
     # fallback
     return AutosensResult(ratio=1.0, sens_result="none")
-
-
 
 
 def parse_meal(context):
@@ -274,7 +262,7 @@ def parse_meal(context):
             meal_cob=0,
             last_carb_time=0,
             slope_from_max_deviation=0.0,
-            slope_from_min_deviation=0.0
+            slope_from_min_deviation=0.0,
         )
 
     # Убираем пробелы
@@ -300,13 +288,14 @@ def parse_meal(context):
         meal_cob=meal_cob,
         last_carb_time=last,
         slope_from_max_deviation=0.0,
-        slope_from_min_deviation=0.0
+        slope_from_min_deviation=0.0,
     )
 
 
 # ============================================================
 #  ПАРСЕР RT(...)
 # ============================================================
+
 
 def parse_rt(rt_line):
     """
@@ -331,13 +320,14 @@ def parse_rt(rt_line):
         "duration": int(get("duration") or 0),
         "rate": get("rate"),
         "iob": get("IOB"),
-        "variable_sens": get("variable_sens")
+        "variable_sens": get("variable_sens"),
     }
 
 
 # ============================================================
 #  СБОРКА ВХОДОВ ДЛЯ PYTHON AUTOISF
 # ============================================================
+
 
 def build_inputs(block):
     ctx = block["context"]
@@ -349,8 +339,9 @@ def build_inputs(block):
     prof = parse_profile(ctx)
     # variable_sens: если нет в профиле — берём из RT
     if prof and (prof.variable_sens is None or prof.variable_sens == 0):
-        if inputs["rt"]["variable_sens"] is not None:
-            prof.variable_sens = inputs["rt"]["variable_sens"] / 18.0
+        rt_data = block.get("rt", {})
+        if rt_data.get("variable_sens") is not None:
+            prof.variable_sens = rt_data["variable_sens"] / 18.0
 
     autosens = parse_autosens(ctx)
     meal = parse_meal(ctx)
@@ -401,9 +392,8 @@ def build_inputs(block):
             smb_delivery_ratio_bg_range=0.0,
             smb_max_range_extension=1.0,
             autoISF_version="3.0.1",
-            variable_sens=6.0
+            variable_sens=6.0,
         )
-
 
     return {
         "glucose_status": gs,
@@ -412,13 +402,14 @@ def build_inputs(block):
         "profile": prof,
         "autosens": autosens,
         "meal": meal,
-        "rt": rt
+        "rt": rt,
     }
 
 
 # ============================================================
 #  ЗАПУСК PYTHON AUTOISF И СРАВНЕНИЕ С AAPS
 # ============================================================
+
 
 def run_autoisf(inputs):
     rt = inputs["rt"]
@@ -440,7 +431,7 @@ def run_autoisf(inputs):
         smb_max_range_extension=1.0,
         iob_threshold_percent=100,
         auto_isf_consoleError=[],
-        auto_isf_consoleLog=[]
+        auto_isf_consoleLog=[],
     )
 
     # ============================================================
@@ -465,29 +456,31 @@ def run_autoisf(inputs):
         "aaps_duration": rt["duration"],
         "py_duration": result.duration,
         "aaps_insreq": rt["insulinReq"],
-        "py_insreq": result.insulinReq
+        "py_insreq": result.insulinReq,
     }
-
 
 
 # ============================================================
 #  CSV
 # ============================================================
 
+
 def save_csv(rows, out="autoisf_compare.csv"):
     with open(out, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow([
-            "timestamp",
-            "AAPS eventualBG",
-            "PY eventualBG",
-            "AAPS rate",
-            "PY rate",
-            "AAPS duration",
-            "PY duration",
-            "AAPS insulinReq",
-            "PY insulinReq"
-        ])
+        w.writerow(
+            [
+                "timestamp",
+                "AAPS eventualBG",
+                "PY eventualBG",
+                "AAPS rate",
+                "PY rate",
+                "AAPS duration",
+                "PY duration",
+                "AAPS insulinReq",
+                "PY insulinReq",
+            ]
+        )
         for r in rows:
             w.writerow(r)
 
@@ -495,6 +488,7 @@ def save_csv(rows, out="autoisf_compare.csv"):
 # ============================================================
 #  ОСНОВНОЙ ЦИКЛ ПО ZIP
 # ============================================================
+
 
 def process_zip(zip_path):
     files = extract_zip(zip_path)
@@ -514,23 +508,29 @@ def process_zip(zip_path):
             ts = re.search(r"timestamp=(\d+)", b["rt"])
             ts = ts.group(1) if ts else "0"
 
-            all_rows.append([
-                ts,
-                cmp["aaps_eventual"],
-                cmp["py_eventual"],
-                cmp["aaps_rate"],
-                cmp["py_rate"],
-                cmp["aaps_duration"],
-                cmp["py_duration"],
-                cmp["aaps_insreq"],
-                cmp["py_insreq"]
-            ])
+            all_rows.append(
+                [
+                    ts,
+                    cmp["aaps_eventual"],
+                    cmp["py_eventual"],
+                    cmp["aaps_rate"],
+                    cmp["py_rate"],
+                    cmp["aaps_duration"],
+                    cmp["py_duration"],
+                    cmp["aaps_insreq"],
+                    cmp["py_insreq"],
+                ]
+            )
 
             print(f"RT timestamp {ts}")
             print(f"  AAPS eventualBG: {cmp['aaps_eventual']:.2f}")
-            
+
             py_ev = cmp["py_eventual"]
-            print(f"  PY   eventualBG: {py_ev:.2f}" if py_ev is not None else "  PY   eventualBG: None")
+            print(
+                f"  PY   eventualBG: {py_ev:.2f}"
+                if py_ev is not None
+                else "  PY   eventualBG: None"
+            )
 
             print(f"  AAPS rate:       {cmp['aaps_rate']}")
             print(f"  PY   rate:       {cmp['py_rate']}")
@@ -550,6 +550,7 @@ def process_zip(zip_path):
 
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) < 2:
         print("Usage: python autoisf_full_testrunner.py logs.zip")
         exit(1)

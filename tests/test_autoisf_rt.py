@@ -1,8 +1,11 @@
 import pytest
+
 from aaps_emulator.core.autoisf_algorithm import determine_basal_autoisf
+
 
 class Dummy:
     pass
+
 
 def make_profile():
     p = Dummy()
@@ -12,11 +15,13 @@ def make_profile():
     p.current_basal = 1.0
     return p
 
+
 def make_glucose(bg=6.0, delta=0.0):
     g = Dummy()
     g.glucose = bg
     g.delta = delta
     return g
+
 
 def test_rt_lowtemp_forces_zero_rate():
     gs = make_glucose()
@@ -26,13 +31,15 @@ def test_rt_lowtemp_forces_zero_rate():
     res = determine_basal_autoisf(gs, None, None, profile, None, None, rt=rt)
     assert res.rate == 0.0
 
+
 def test_rt_eventualBG_overrides_projection():
     gs = make_glucose(bg=10.0, delta=-1.0)
     profile = make_profile()
     rt = "eventualBG=144"  # mg/dL → 8.0 mmol/L
 
     res = determine_basal_autoisf(gs, None, None, profile, None, None, rt=rt)
-    assert pytest.approx(res.eventualBG, rel=1e-6) == 144/18
+    assert pytest.approx(res.eventualBG, rel=1e-6) == 144 / 18
+
 
 def test_rt_rate_has_priority():
     gs = make_glucose(bg=10.0, delta=0.0)
