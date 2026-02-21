@@ -2,6 +2,7 @@ import re
 from typing import Any, Dict, Optional
 from re import Match
 
+
 def parse_rt_to_dict(rt_obj: Any) -> Dict:
     parsed: dict[str, object] = {}
 
@@ -30,7 +31,6 @@ def parse_rt_to_dict(rt_obj: Any) -> Dict:
     )
     if m_eventual:
         parsed["eventualBG"] = float(m_eventual.group(1).replace(",", "."))
-
 
     return parsed
 
