@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Optional
 
 
 # -----------------------------
@@ -61,11 +61,11 @@ class CurrentTemp:
 # -----------------------------
 @dataclass
 class Predictions:
-    IOB: Optional[List[int]] = None
-    COB: Optional[List[int]] = None
-    aCOB: Optional[List[int]] = None
-    UAM: Optional[List[int]] = None
-    ZT: Optional[List[int]] = None
+    IOB: list[int] | None = None
+    COB: list[int] | None = None
+    aCOB: list[int] | None = None
+    UAM: list[int] | None = None
+    ZT: list[int] | None = None
 
 
 # -----------------------------
@@ -166,26 +166,26 @@ class RT:
     running_dynamic_isf: bool
     timestamp: int
 
-    bg: Optional[float] = None
-    tick: Optional[str] = None
-    eventual_bg: Optional[float] = None
-    target_bg: Optional[float] = None
-    insulin_req: Optional[float] = None
-    carbs_req: Optional[int] = None
-    carbs_req_within: Optional[int] = None
+    bg: float | None = None
+    tick: str | None = None
+    eventual_bg: float | None = None
+    target_bg: float | None = None
+    insulin_req: float | None = None
+    carbs_req: int | None = None
+    carbs_req_within: int | None = None
 
-    deliver_at: Optional[int] = None
-    sensitivity_ratio: Optional[float] = None
+    deliver_at: int | None = None
+    sensitivity_ratio: float | None = None
 
-    duration: Optional[int] = None
-    rate: Optional[float] = None
+    duration: int | None = None
+    rate: float | None = None
 
-    pred_bgs: Optional[Predictions] = None
+    pred_bgs: Predictions | None = None
 
-    cob: Optional[float] = None
-    iob: Optional[float] = None
-    variable_sens: Optional[float] = None
+    cob: float | None = None
+    iob: float | None = None
+    variable_sens: float | None = None
 
     reason: str = ""
-    console_log: List[str] = field(default_factory=list)
-    console_error: List[str] = field(default_factory=list)
+    console_log: list[str] = field(default_factory=list)
+    console_error: list[str] = field(default_factory=list)

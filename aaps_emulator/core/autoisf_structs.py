@@ -1,6 +1,5 @@
 # aaps_emulator/core/autoisf_structs.py
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -24,7 +23,7 @@ class GlucoseStatus:
 class IobTotal:
     iob: float
     activity: float
-    iob_with_zero_temp: Optional[object] = None
+    iob_with_zero_temp: object | None = None
 
     def __str__(self):
         return f"IobTotal(iob={self.iob}, activity={self.activity})"
@@ -39,16 +38,13 @@ class MealData:
     slope_from_min_deviation: float = 0.0
 
     def __str__(self):
-        return (
-            f"MealData(carbs={self.carbs}, mealCOB={self.meal_cob}, "
-            f"lastCarbTime={self.last_carb_time})"
-        )
+        return f"MealData(carbs={self.carbs}, mealCOB={self.meal_cob}, lastCarbTime={self.last_carb_time})"
 
 
 @dataclass
 class AutosensResult:
     ratio: float
-    sens_result: Optional[str] = None
+    sens_result: str | None = None
 
     def __str__(self):
         return f"AutosensResult(ratio={self.ratio}, sens_result={self.sens_result})"
@@ -92,7 +88,7 @@ class OapsProfileAutoIsf:
     smb_max_range_extension: float = 1.0
     maxSMBBasalMinutes: int = 90
     maxUAMSMBBasalMinutes: int = 60
-    variable_sens: Optional[float] = None
+    variable_sens: float | None = None
 
     # additional fields used in some code paths
     sensitivity_raises_target: bool = False

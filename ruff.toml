@@ -1,6 +1,7 @@
 line-length = 120
 target-version = "py311"
 
+[lint]
 select = [
     "E",
     "F",
@@ -16,9 +17,14 @@ ignore = [
     "E501",
 ]
 
-[isort]
+[lint.isort]
 combine-as-imports = true
 force-sort-within-sections = true
 
-[flake8-bandit]
+[lint.flake8-bandit]
 check-typed-exception = true
+
+[lint.per-file-ignores]
+"aaps_emulator/tests/*" = ["S101"]
+
+

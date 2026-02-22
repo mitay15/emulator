@@ -18,7 +18,7 @@ def main():
     args = p.parse_args()
 
     rows, blocks, inputs = run_compare_on_all_logs(args.logs)
-    for r, b, inp in zip(rows, blocks, inputs):
+    for r, b, inp in zip(rows, blocks, inputs, strict=True):
         if r["idx"] == args.idx:
             print("ROW:", r)
             print(

@@ -71,9 +71,7 @@ class MainWindow(QtWidgets.QMainWindow):
         inp = self.inputs[pos]
 
         # update views; pass callback so signals can call back to select timeline
-        self.signals_tab.update_signals(
-            self.rows, self.inputs, idx, on_select_callback=self.select_rt
-        )
+        self.signals_tab.update_signals(self.rows, self.inputs, idx, on_select_callback=self.select_rt)
         self.context_tab.update_context(block)
         self.details_tab.update_details(inp, block)
         # update compare with full rows and selected idx

@@ -7,9 +7,12 @@ Run from inside aaps_emulator:
 
 import argparse
 import csv
+import logging
 
 from analysis.compare_runner import run_compare_on_all_logs
 from core.autoisf_algorithm import determine_basal_autoisf
+
+logger = logging.getLogger(__name__)
 
 
 def safe_float(s, default=0.0):
@@ -27,6 +30,7 @@ def load_reference(path):
             try:
                 idx = int(rec.get("idx"))
             except Exception:
+                logger.exception("regression_checks: skipping row due to exception")
                 continue
             ref[idx] = {
                 "aaps_eventual": safe_float(rec.get("aaps_eventual")),
@@ -48,7 +52,7 @@ def main():
 
     # build mapping idx -> (row, block, input)
     mapping = {}
-    for r, b, inp in zip(rows, blocks, inputs):
+    for r, b, inp in zip(rows, blocks, inputs, strict=True):
         mapping[r.get("idx")] = (r, b, inp)
 
     # default checks: all reference idxs or provided subset
@@ -73,10 +77,7 @@ def main():
             auto_isf_consoleLog=logs,
         )
         ref = reference[idx]
-        ev_ok = (
-            res.eventualBG is not None
-            and abs(res.eventualBG - ref["aaps_eventual"]) <= 0.5
-        )
+        ev_ok = res.eventualBG is not None and abs(res.eventualBG - ref["aaps_eventual"]) <= 0.5
         rate_ok = abs((res.rate or 0.0) - ref["aaps_rate"]) <= 1.0
         ins_ok = abs((res.insulinReq or 0.0) - ref["aaps_insreq"]) <= 0.5
         print(

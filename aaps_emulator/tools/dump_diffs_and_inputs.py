@@ -37,7 +37,7 @@ def main():
                 "input_json",
             ]
         )
-        for r, b, inp in zip(rows, blocks, inputs):
+        for r, _b, inp in zip(rows, blocks, inputs, strict=True):
             idx = r.get("idx")
             errs = []
             logs = []

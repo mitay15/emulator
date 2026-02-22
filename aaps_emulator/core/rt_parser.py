@@ -1,9 +1,9 @@
 import re
 from re import Match
-from typing import Any, Dict, Optional
+from typing import Any
 
 
-def parse_rt_to_dict(rt_obj: Any) -> Dict:
+def parse_rt_to_dict(rt_obj: Any) -> dict:
     parsed: dict[str, object] = {}
 
     if rt_obj is None:
@@ -26,16 +26,14 @@ def parse_rt_to_dict(rt_obj: Any) -> Dict:
         parsed[m.group(1)] = float(m.group(2).replace(",", "."))
 
     # 3) Eventual BG 13,4
-    m_eventual: Optional[Match[str]] = re.search(
-        r"eventual\s*bg\s*([0-9]+(?:[.,][0-9]+)?)", s, re.IGNORECASE
-    )
+    m_eventual: Match[str] | None = re.search(r"eventual\s*bg\s*([0-9]+(?:[.,][0-9]+)?)", s, re.IGNORECASE)
     if m_eventual:
         parsed["eventualBG"] = float(m_eventual.group(1).replace(",", "."))
 
     return parsed
 
 
-def extract_lowtemp_rate(parsed_rt: Dict) -> Optional[float]:
+def extract_lowtemp_rate(parsed_rt: dict) -> float | None:
     """
     Извлекает low-temp rate из любых строк AAPS.
     """

@@ -7,10 +7,13 @@ Usage (from inside aaps_emulator):
 
 import argparse
 import csv
+import logging
 import math
 
 from analysis.compare_runner import run_compare_on_all_logs
 from core.autoisf_algorithm import determine_basal_autoisf
+
+logger = logging.getLogger(__name__)
 
 
 def safe_float(s, default=0.0):
@@ -51,6 +54,7 @@ def load_reference_csv(path):
             try:
                 idx = int(str(idx_raw).strip())
             except Exception:
+                logger.exception("compare_with_reference: skipping row due to exception")
                 continue
             rows[idx] = {
                 "ts_s": safe_int(rec.get("ts_s"), 0),
@@ -84,7 +88,7 @@ def main():
     rate_errors = []
     ins_errors = []
 
-    for r, b, inp in zip(rows, blocks, inputs):
+    for r, _b, inp in zip(rows, blocks, inputs, strict=True):
         idx = r.get("idx")
         ref = reference.get(idx)
         if ref is None:
@@ -117,28 +121,24 @@ def main():
 
         compared += 1
         try:
-            ev_err = (
-                float(py_ev) - float(ref_ev)
-                if py_ev is not None
-                else float(ref_ev) * -1.0
-            )
+            ev_err = float(py_ev) - float(ref_ev) if py_ev is not None else float(ref_ev) * -1.0
             ev_errors.append(ev_err)
             if abs(ev_err) <= 0.5:
                 within_tol += 1
         except Exception:
-            pass
+            logger.exception("compare_with_reference: suppressed exception")
 
         try:
             rate_err = float(py_rate) - float(ref_rate)
             rate_errors.append(rate_err)
         except Exception:
-            pass
+            logger.exception("compare_with_reference: suppressed exception")
 
         try:
             ins_err = float(py_ins) - float(ref_ins)
             ins_errors.append(ins_err)
         except Exception:
-            pass
+            logger.exception("compare_with_reference: suppressed exception")
 
     print("Comparison summary:")
     print(f"  total compared: {compared}")
@@ -147,26 +147,28 @@ def main():
     print(f"  RMSE rate: {rmse(rate_errors)}")
     print(f"  RMSE insulinReq: {rmse(ins_errors)}")
 
-    # Top 10 by absolute eventualBG error
+    # Top 10 eventualBG errors:
     ev_abs_sorted = sorted(
-        [(i, e) for i, e in enumerate(ev_errors)], key=lambda x: abs(x[1]), reverse=True
+        enumerate(ev_errors),
+        key=lambda x: abs(x[1]),
+        reverse=True,
     )[:10]
     print("\nTop 10 eventualBG errors:")
     # we need mapping from enumerate index to actual row idx; rebuild list of compared idxs
     compared_idxs = []
-    for r, b, inp in zip(rows, blocks, inputs):
+    for r, _b, _inp in zip(rows, blocks, inputs, strict=True):
         idx = r.get("idx")
         if idx is None:
             continue
         if idx in reference:
             compared_idxs.append(idx)
-    for pos, (enum_idx, err) in enumerate(ev_abs_sorted):
+    for _pos, (enum_idx, err) in enumerate(ev_abs_sorted):
         try:
             real_idx = compared_idxs[enum_idx]
             ref_ev = reference.get(real_idx).get("aaps_eventual")
             # recompute py_ev by calling algorithm again for clarity
             inp = None
-            for rr, bb, ii in zip(rows, blocks, inputs):
+            for rr, _bb, ii in zip(rows, blocks, inputs, strict=True):
                 if rr.get("idx") == real_idx:
                     inp = ii
                     break
@@ -192,7 +194,7 @@ def main():
 
     # Top 10 by absolute rate error
     rate_abs_sorted = sorted(
-        [(i, e) for i, e in enumerate(rate_errors)],
+        enumerate(rate_errors),
         key=lambda x: abs(x[1]),
         reverse=True,
     )[:10]
@@ -206,7 +208,7 @@ def main():
 
     # Top 10 by absolute insulinReq error
     ins_abs_sorted = sorted(
-        [(i, e) for i, e in enumerate(ins_errors)],
+        enumerate(ins_errors),
         key=lambda x: abs(x[1]),
         reverse=True,
     )[:10]

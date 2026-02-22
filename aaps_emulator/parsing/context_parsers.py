@@ -55,9 +55,7 @@ def parse_iob_history(context):
     for line in context:
         if "IobTotal(" in line:
             clean = line.replace(" ", "")
-            m = re.search(
-                r"IobTotal\(time=(\d+),iob=([0-9.\-E]+),activity=([0-9.\-E]+)", clean
-            )
+            m = re.search(r"IobTotal\(time=(\d+),iob=([0-9.\-E]+),activity=([0-9.\-E]+)", clean)
             if m:
                 iobs.append(
                     IobTotal(

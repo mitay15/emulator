@@ -1,11 +1,14 @@
 # aaps_emulator/gui/widgets/compare_view.py
-import os
 from datetime import datetime
+import logging
+import os
 
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from PyQt6 import QtCore, QtGui, QtWidgets
+
+logger = logging.getLogger(__name__)
 
 
 class CompareView(QtWidgets.QWidget):
@@ -31,7 +34,7 @@ class CompareView(QtWidgets.QWidget):
             self.save_btn.setIcon(QtGui.QIcon(self._icon_path("save.png")))
             self.save_btn.setIconSize(QtCore.QSize(20, 20))
         except Exception:
-            pass
+            logger.exception("compare_view: suppressed exception")
 
         # larger button
         self.save_btn.setFixedHeight(36)
@@ -72,9 +75,7 @@ class CompareView(QtWidgets.QWidget):
         py = [r.get("py_eventual") or 0.0 for r in rows]
 
         self.ax.clear()
-        self.ax.plot(
-            dt, aaps, label="AAPS eventualBG (mmol/L)", color="#1976d2", linewidth=2
-        )
+        self.ax.plot(dt, aaps, label="AAPS eventualBG (mmol/L)", color="#1976d2", linewidth=2)
         self.ax.plot(
             dt,
             py,
@@ -85,34 +86,28 @@ class CompareView(QtWidgets.QWidget):
         )
 
         self.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-        self.ax.xaxis.set_major_formatter(
-            mdates.ConciseDateFormatter(mdates.AutoDateLocator())
-        )
+        self.ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(mdates.AutoDateLocator()))
         self.ax.set_xlabel("Дата / Время")
         self.ax.set_ylabel("eventualBG (mmol/L)")
         self.ax.legend()
         self.ax.grid(alpha=0.25)
 
         if self._selected_idx is not None:
-            pos = next(
-                (i for i, r in enumerate(rows) if r["idx"] == self._selected_idx), None
-            )
+            pos = next((i for i, r in enumerate(rows) if r["idx"] == self._selected_idx), None)
             if pos is not None:
                 x_sel = dt[pos]
                 if self._vline:
                     try:
                         self._vline.remove()
                     except Exception:
-                        pass
+                        logger.exception("compare_view: suppressed exception")
                 if self._annot:
                     try:
                         self._annot.remove()
                     except Exception:
-                        pass
+                        logger.exception("compare_view: suppressed exception")
 
-                self._vline = self.ax.axvline(
-                    x_sel, color="#d32f2f", linestyle="--", linewidth=1.5, alpha=0.9
-                )
+                self._vline = self.ax.axvline(x_sel, color="#d32f2f", linestyle="--", linewidth=1.5, alpha=0.9)
                 txt = f"#{self._selected_idx}\nAAPS {aaps[pos]:.2f}\nPY {py[pos]:.2f}"
                 y_top = max(max(aaps), max(py)) if aaps and py else 0
                 self._annot = self.ax.annotate(
@@ -120,7 +115,7 @@ class CompareView(QtWidgets.QWidget):
                     xy=(x_sel, y_top),
                     xytext=(10, -30),
                     textcoords="offset points",
-                    bbox=dict(boxstyle="round", fc="w", alpha=0.9),
+                    bbox={"boxstyle": "round", "fc": "w", "alpha": 0.9},
                 )
 
         self.fig.tight_layout()

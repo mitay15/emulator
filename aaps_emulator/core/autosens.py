@@ -18,16 +18,18 @@
 - compute_autosens_ratio(history_points, window_minutes=180, min_points=4, clip=(0.7,1.3))
 """
 
+import logging
 import math
 import statistics
-from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def compute_autosens_ratio(
-    history_points: List[Dict],
+    history_points: list[dict],
     window_minutes: int = 180,
     min_points: int = 4,
-    clip: Optional[tuple] = (0.7, 1.3),
+    clip: tuple | None = (0.7, 1.3),
 ) -> float:
     """
     history_points: список словарей, каждый должен содержать:
@@ -85,6 +87,7 @@ def compute_autosens_ratio(
                 if math.isfinite(ratio_est) and ratio_est > 0:
                     ratios.append(ratio_est)
         except Exception:
+            logger.exception("autosens: skipping point due to exception")
             continue
 
     # if not enough points, return 1.0
