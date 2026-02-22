@@ -1,7 +1,9 @@
-# Максимальная длина строки (совместимо с Black)
-line-length = 120
+# Ruff configuration
 
-# Какие правила включены
+line-length = 120
+target-version = "py311"
+
+# Enabled rule sets
 select = [
     "E",   # pycodestyle
     "F",   # pyflakes
@@ -13,19 +15,16 @@ select = [
     "UP",  # pyupgrade
 ]
 
-# Какие правила отключены
+# Rules to ignore
 ignore = [
-    "E501",  # длина строки — Black решает сам
+    "E501",  # line length handled by Black
 ]
 
-# Строгий режим
-target-version = "py311"
-
-# Автоматическая сортировка импортов
+# Import sorting configuration
 [tool.ruff.isort]
 combine-as-imports = true
 force-sort-within-sections = true
 
-# Настройки безопасности (Bandit)
+# Security settings
 [tool.ruff.flake8-bandit]
 check-typed-exception = true
