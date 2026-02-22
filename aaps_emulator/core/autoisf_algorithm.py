@@ -205,7 +205,6 @@ def determine_basal_autoisf(
                 bg = bg / 18.0
                 auto_isf_consoleLog.append(f"Converted BG from mg/dL to mmol/L: {bg:.3f}")
                 trace(tc, "bg_converted_mmol", bg)
-
             try:
                 if bg is not None:
                     eventualBG = bg + (delta * 30.0)

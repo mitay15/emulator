@@ -26,7 +26,9 @@ def parse_rt_to_dict(rt_obj: Any) -> dict:
         parsed[m.group(1)] = float(m.group(2).replace(",", "."))
 
     # 3) Eventual BG 13,4
-    m_eventual: Match[str] | None = re.search(r"eventual\s*bg\s*([0-9]+(?:[.,][0-9]+)?)", s, re.IGNORECASE)
+    m_eventual: Match[str] | None = re.search(
+        r"eventual\s*bg\s*([0-9]+(?:[.,][0-9]+)?)", s, re.IGNORECASE
+    )
     if m_eventual:
         parsed["eventualBG"] = float(m_eventual.group(1).replace(",", "."))
 

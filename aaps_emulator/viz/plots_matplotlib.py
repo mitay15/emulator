@@ -16,7 +16,9 @@ def plot_error_heatmap(rows, bin_by="hour"):
 
     # compute absolute error
     ts = np.array([r["ts_s"] for r in rows])
-    err = np.array([abs((r["aaps_eventual"] or 0) - (r["py_eventual"] or 0)) for r in rows])
+    err = np.array(
+        [abs((r["aaps_eventual"] or 0) - (r["py_eventual"] or 0)) for r in rows]
+    )
 
     # convert timestamps to datetime
     dt = [datetime.fromtimestamp(int(t)) for t in ts]
@@ -41,7 +43,10 @@ def plot_error_heatmap(rows, bin_by="hour"):
     ax.bar(range(len(uniq)), [1] * len(uniq), color=colors)
     ax.set_xticks(range(len(uniq)))
     ax.set_xticklabels(
-        [u.strftime("%Y-%m-%d %H:%M") if bin_by == "hour" else u.strftime("%Y-%m-%d") for u in uniq],
+        [
+            u.strftime("%Y-%m-%d %H:%M") if bin_by == "hour" else u.strftime("%Y-%m-%d")
+            for u in uniq
+        ],
         rotation=45,
         ha="right",
     )
