@@ -46,7 +46,11 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> float | None:
 
     # dict-like rt
     if isinstance(rt_obj, dict):
-        ev = rt_obj.get("eventualBG") or rt_obj.get("eventual_bg") or rt_obj.get("eventual")
+        ev = (
+            rt_obj.get("eventualBG")
+            or rt_obj.get("eventual_bg")
+            or rt_obj.get("eventual")
+        )
         if ev is not None:
             try:
                 evf = float(ev)
@@ -56,7 +60,9 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> float | None:
             except Exception:
                 logger.exception("autoisf_algorithm: suppressed exception")
 
-        preds = rt_obj.get("predBGs") or rt_obj.get("predictions") or rt_obj.get("preds")
+        preds = (
+            rt_obj.get("predBGs") or rt_obj.get("predictions") or rt_obj.get("preds")
+        )
         if preds and isinstance(preds, list | tuple) and len(preds) > 0:
             try:
                 last = float(preds[-1])
@@ -64,7 +70,9 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> float | None:
                     return last / 18.0
                 return last
             except Exception:
-                logger.exception("autoisf_algorithm: suppressed exception in preds parsing")
+                logger.exception(
+                    "autoisf_algorithm: suppressed exception in preds parsing"
+                )
 
         return None
 
@@ -88,14 +96,18 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> float | None:
                 return val
 
         # try "Eventual BG 14,2" or "EventualBG is 14.2"
-        m = re.search(r"eventual\s*bg\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)", s, flags=re.IGNORECASE)
+        m = re.search(
+            r"eventual\s*bg\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)", s, flags=re.IGNORECASE
+        )
         if m:
             val = float(m.group(1).replace(",", "."))
             if val > 30:
                 return val / 18.0
             return val
     except Exception:
-        logger.exception("autoisf_algorithm: suppressed exception in eventualBG projection")
+        logger.exception(
+            "autoisf_algorithm: suppressed exception in eventualBG projection"
+        )
 
     return None
 
@@ -159,14 +171,18 @@ def determine_basal_autoisf(
             ev_from_rt = _extract_predicted_eventual_from_rt(rt_obj)
             if ev_from_rt is not None:
                 eventualBG = ev_from_rt
-                auto_isf_consoleLog.append(f"Using predicted eventualBG from rt: {eventualBG:.3f} mmol/L")
+                auto_isf_consoleLog.append(
+                    f"Using predicted eventualBG from rt: {eventualBG:.3f} mmol/L"
+                )
 
         # 2) fallback to simple delta projection if no predictions
         if eventualBG is None:
             # convert bg units if needed (mg/dL -> mmol/L)
             if bg is not None and bg > 50:
                 bg = bg / 18.0
-                auto_isf_consoleLog.append(f"Converted BG from mg/dL to mmol/L: {bg:.3f}")
+                auto_isf_consoleLog.append(
+                    f"Converted BG from mg/dL to mmol/L: {bg:.3f}"
+                )
 
             try:
                 eventualBG = bg + (delta * 30.0)
@@ -202,12 +218,18 @@ def determine_basal_autoisf(
                     sens_ratio_rt = float(sens_ratio_rt)
             if sens_ratio_rt:
                 autosens_ratio = float(sens_ratio_rt)
-                auto_isf_consoleLog.append(f"Using sensitivityRatio from rt: {autosens_ratio:.3f}")
+                auto_isf_consoleLog.append(
+                    f"Using sensitivityRatio from rt: {autosens_ratio:.3f}"
+                )
         except Exception:
-            logger.exception("autoisf_algorithm: suppressed exception in duration calculation")
+            logger.exception(
+                "autoisf_algorithm: suppressed exception in duration calculation"
+            )
 
         # effective sensitivity (rounded to reduce floating noise)
-        prof_sens = getattr(profile, "variable_sens", None) or getattr(profile, "sens", None)
+        prof_sens = getattr(profile, "variable_sens", None) or getattr(
+            profile, "sens", None
+        )
         if prof_sens is None or prof_sens == 0:
             prof_sens = 6.0
         prof_sens = round(float(prof_sens), 3)
@@ -226,13 +248,17 @@ def determine_basal_autoisf(
                     if rd > 300:
                         rd = max(5, rd // 60)
                     duration = max(5, rd)
-                    auto_isf_consoleLog.append(f"Using duration from rt: {duration} minutes")
+                    auto_isf_consoleLog.append(
+                        f"Using duration from rt: {duration} minutes"
+                    )
                 else:
                     preds = rt_obj.get("predBGs") or rt_obj.get("predictions")
                     if preds and isinstance(preds, list | tuple):
                         duration = max(duration, len(preds) * 5)
         except Exception:
-            logger.exception("autoisf_algorithm: suppressed exception in sensitivityRatio")
+            logger.exception(
+                "autoisf_algorithm: suppressed exception in sensitivityRatio"
+            )
 
         try:
             if currenttemp is not None:
@@ -240,7 +266,9 @@ def determine_basal_autoisf(
                 if dur > 0:
                     duration = max(duration, dur)
         except Exception:
-            logger.exception("autoisf_algorithm: suppressed exception in duration fallback")
+            logger.exception(
+                "autoisf_algorithm: suppressed exception in duration fallback"
+            )
 
         if loop_wanted_smb and loop_wanted_smb != "none":
             duration = max(duration, 60)
@@ -252,7 +280,9 @@ def determine_basal_autoisf(
         lowtemp = extract_lowtemp_rate(parsed_rt)
         if lowtemp is not None:
             parsed_rt["rate"] = lowtemp
-            auto_isf_consoleLog.append(f"Parsed low-temp rate from RT: {lowtemp:.3f} U/h")
+            auto_isf_consoleLog.append(
+                f"Parsed low-temp rate from RT: {lowtemp:.3f} U/h"
+            )
 
         # Флаг отключения базала
         rt_disable_basal = False
@@ -272,7 +302,9 @@ def determine_basal_autoisf(
             ]
         ):
             rt_disable_basal = True
-            auto_isf_consoleLog.append("RT indicates SMB disabled / zero-temp → forcing basal=0 later")
+            auto_isf_consoleLog.append(
+                "RT indicates SMB disabled / zero-temp → forcing basal=0 later"
+            )
         # --- end RT pre-checks ---
 
         # insulin requirement (U) - compute after duration so rt.rate/ins can be used if present
@@ -298,9 +330,17 @@ def determine_basal_autoisf(
             rt_rate_val = None
             try:
                 if isinstance(parsed_rt, dict):
-                    rt_rate_provided_flag = parsed_rt.get("rate") or parsed_rt.get("deliveryRate")
-                if rt_rate_provided_flag is None and rt_obj and isinstance(rt_obj, dict):
-                    rt_rate_provided_flag = rt_obj.get("rate") or rt_obj.get("deliveryRate")
+                    rt_rate_provided_flag = parsed_rt.get("rate") or parsed_rt.get(
+                        "deliveryRate"
+                    )
+                if (
+                    rt_rate_provided_flag is None
+                    and rt_obj
+                    and isinstance(rt_obj, dict)
+                ):
+                    rt_rate_provided_flag = rt_obj.get("rate") or rt_obj.get(
+                        "deliveryRate"
+                    )
                 if rt_rate_provided_flag is not None:
                     rt_rate_val = float(rt_rate_provided_flag)
             except Exception:
@@ -349,8 +389,12 @@ def determine_basal_autoisf(
 
                 # SMB scaling: apply only for very small insulinReq to avoid underdelivery
                 smb_threshold = 1.0
-                if abs(insulinReq) < smb_threshold and getattr(profile, "enableSMB_always", False):
-                    smb_ratio_local = getattr(profile, "smb_delivery_ratio", smb_ratio or 0.5)
+                if abs(insulinReq) < smb_threshold and getattr(
+                    profile, "enableSMB_always", False
+                ):
+                    smb_ratio_local = getattr(
+                        profile, "smb_delivery_ratio", smb_ratio or 0.5
+                    )
                     raw_rate = raw_rate * float(smb_ratio_local)
             else:
                 # log that we intentionally skipped delta cap/SMB for RT rate
@@ -363,9 +407,13 @@ def determine_basal_autoisf(
                 rt_rate_provided_flag_check = None
                 try:
                     if isinstance(parsed_rt, dict):
-                        rt_rate_provided_flag_check = parsed_rt.get("rate") or parsed_rt.get("deliveryRate")
+                        rt_rate_provided_flag_check = parsed_rt.get(
+                            "rate"
+                        ) or parsed_rt.get("deliveryRate")
                     elif rt_obj and isinstance(rt_obj, dict):
-                        rt_rate_provided_flag_check = rt_obj.get("rate") or rt_obj.get("deliveryRate")
+                        rt_rate_provided_flag_check = rt_obj.get("rate") or rt_obj.get(
+                            "deliveryRate"
+                        )
                 except Exception:
                     rt_rate_provided_flag_check = None
 
@@ -376,9 +424,13 @@ def determine_basal_autoisf(
                     and not rt_rate_provided_flag_check
                 ):
                     raw_rate = 0.0
-                    auto_isf_consoleLog.append("insulinReq==0.0 and no RT rate provided — forcing raw_rate=0.0")
+                    auto_isf_consoleLog.append(
+                        "insulinReq==0.0 and no RT rate provided — forcing raw_rate=0.0"
+                    )
             except Exception:
-                logger.exception("autoisf_algorithm: suppressed exception in raw_rate calculation")
+                logger.exception(
+                    "autoisf_algorithm: suppressed exception in raw_rate calculation"
+                )
 
             # final logging of source
             final_rate_source = "computed"
@@ -388,7 +440,9 @@ def determine_basal_autoisf(
 
             try:
                 if (
-                    isinstance(parsed_rt, dict) and (parsed_rt.get("rate") or parsed_rt.get("deliveryRate")) is not None
+                    isinstance(parsed_rt, dict)
+                    and (parsed_rt.get("rate") or parsed_rt.get("deliveryRate"))
+                    is not None
                 ) or (
                     rt_obj
                     and isinstance(rt_obj, dict)
@@ -398,7 +452,9 @@ def determine_basal_autoisf(
                 elif insulinReq is not None and rt_ins is not None:
                     final_rate_source = "rt_insulinReq"
             except Exception:
-                logger.exception("autoisf_algorithm: suppressed exception in rt_rate_provided_flag_check")
+                logger.exception(
+                    "autoisf_algorithm: suppressed exception in rt_rate_provided_flag_check"
+                )
 
             auto_isf_consoleLog.append(
                 f"Final rate decision (pre-clamp): raw_rate={raw_rate:.3f} source={final_rate_source}"
@@ -423,7 +479,9 @@ def determine_basal_autoisf(
                     if rt_rate_val is None:
                         raw_rate = min(raw_rate, allowed_max)
                 except Exception:
-                    logger.exception("autoisf_algorithm: suppressed exception in final_rate rounding")
+                    logger.exception(
+                        "autoisf_algorithm: suppressed exception in final_rate rounding"
+                    )
 
                 # Ensure non-negative
                 final_rate = max(0.0, raw_rate)
@@ -446,7 +504,9 @@ def determine_basal_autoisf(
                 )
                 rate = 0.0
         except Exception:
-            logger.exception("autoisf_algorithm: suppressed exception in RT disable basal")
+            logger.exception(
+                "autoisf_algorithm: suppressed exception in RT disable basal"
+            )
 
         # fill result
         res.eventualBG = eventualBG
