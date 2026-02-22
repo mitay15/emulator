@@ -19,17 +19,14 @@ jobs:
       - name: Install tools
         run: |
           pip install --upgrade pip
-          pip install black isort flake8 mypy pytest
+          pip install ruff black mypy pytest
           pip install .
 
-      - name: Run isort (check)
-        run: isort . --check-only
+      - name: Run Ruff (lint)
+        run: ruff check .
 
-      - name: Run black (check)
-        run: black . --check
-
-      - name: Run flake8
-        run: flake8 aaps_emulator
+      - name: Run Ruff (format check)
+        run: ruff format --check .
 
       - name: Run mypy
         run: mypy aaps_emulator
@@ -48,11 +45,12 @@ jobs:
 
       - name: Install tools
         run: |
-          pip install black isort
+          pip install ruff black
 
       - name: Auto-format code
         run: |
-          isort .
+          ruff check . --fix
+          ruff format .
           black .
 
       - name: Commit changes
@@ -60,10 +58,8 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           git add .
-          git commit -m "Auto-format code" || echo "No changes to commit"
-
-      - name: Push changes
-        run: git push
+          git commit -m "Auto-format code" || echo "No changes"
+          git push
 
   tests:
     runs-on: ubuntu-latest
@@ -81,6 +77,6 @@ jobs:
         run: |
           pip install pytest
           pip install .
-      
+
       - name: Run tests
         run: pytest -q
