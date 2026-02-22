@@ -3,28 +3,24 @@
 line-length = 120
 target-version = "py311"
 
-# Enabled rule sets
 select = [
     "E",   # pycodestyle
     "F",   # pyflakes
     "W",   # warnings
     "I",   # isort (import sorting)
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "S",   # flake8-bandit (security)
+    "B",   # bugbear
+    "C4",  # comprehensions
+    "S",   # security (bandit)
     "UP",  # pyupgrade
 ]
 
-# Rules to ignore
 ignore = [
     "E501",  # line length handled by Black
 ]
 
-# Import sorting configuration
-[tool.ruff.isort]
+[isort]
 combine-as-imports = true
 force-sort-within-sections = true
 
-# Security settings
-[tool.ruff.flake8-bandit]
+[flake8-bandit]
 check-typed-exception = true
