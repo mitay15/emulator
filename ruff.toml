@@ -1,0 +1,24 @@
+line-length = 120
+target-version = "py311"
+
+select = [
+    "E",
+    "F",
+    "W",
+    "I",
+    "B",
+    "C4",
+    "S",
+    "UP",
+]
+
+ignore = [
+    "E501",
+]
+
+[isort]
+combine-as-imports = true
+force-sort-within-sections = true
+
+[flake8-bandit]
+check-typed-exception = true
