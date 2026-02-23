@@ -1,13 +1,18 @@
-# aaps_emulator/gui/main_qt.py
+import shutil
+import sys
 
-from analysis.compare_runner import run_compare_on_all_logs
-from gui.widgets.compare_view import CompareView
-from gui.widgets.context_view import ContextView
-from gui.widgets.details_view import DetailsView
-from gui.widgets.filters_bar import FiltersBar
-from gui.widgets.signals_view import SignalsView
-from gui.widgets.timeline_view import TimelineView
 from PyQt6 import QtGui, QtWidgets
+
+from aaps_emulator.analysis.compare_runner import run_compare_on_all_logs
+from aaps_emulator.config import LOGS_PATH, LOGS_ZIP
+from aaps_emulator.gui.autoisf_report_widget import AutoISFReportWidget
+from aaps_emulator.gui.widgets.compare_view import CompareView
+from aaps_emulator.gui.widgets.context_view import ContextView
+from aaps_emulator.gui.widgets.details_view import DetailsView
+from aaps_emulator.gui.widgets.filters_bar import FiltersBar
+from aaps_emulator.gui.widgets.signals_view import SignalsView
+from aaps_emulator.gui.widgets.timeline_view import TimelineView
+from aaps_emulator.tools.autoisf_full_report import load_worst_rows
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -30,37 +35,45 @@ class MainWindow(QtWidgets.QMainWindow):
         self.filter_bar = FiltersBar()
         right_layout.addWidget(self.filter_bar)
 
+        self.load_logs_btn = QtWidgets.QPushButton("Загрузить логи…")
+        right_layout.addWidget(self.load_logs_btn)
+        self.load_logs_btn.clicked.connect(self.load_logs_dialog)
+
         self.tabs = QtWidgets.QTabWidget()
         self.signals_tab = SignalsView()
         self.context_tab = ContextView()
         self.details_tab = DetailsView()
         self.compare_tab = CompareView()
+        self.autoisf_tab = AutoISFReportWidget()
 
         self.tabs.addTab(self.signals_tab, "Signals")
         self.tabs.addTab(self.context_tab, "Context")
         self.tabs.addTab(self.details_tab, "Details")
         self.tabs.addTab(self.compare_tab, "Compare")
+        self.tabs.addTab(self.autoisf_tab, "AutoISF Report")
+
+        self.autoisf_tab.bridge.main_window = self
+        self.autoisf_tab.report_rebuilt.connect(self.on_report_rebuilt)
 
         right_layout.addWidget(self.tabs)
         main_layout.addLayout(right_layout, 5)
 
-        # load data
-        self.rows, self.blocks, self.inputs = run_compare_on_all_logs("logs")
+        self.rows, self.blocks, self.inputs = run_compare_on_all_logs(str(LOGS_PATH))
 
-        # populate timeline
+        worst = set(load_worst_rows())
+        for r in self.rows:
+            r["is_worst"] = r["idx"] in worst
+
         self.timeline.load(self.rows, self.inputs)
 
-        # connect signals
         self.timeline.rt_selected.connect(self.on_rt_selected)
         self.filter_bar.filters_changed.connect(self.on_filters_changed)
 
-        # initial selection: first item if exists
         if self.rows:
             first_idx = self.rows[0]["idx"]
             self.select_rt(first_idx)
 
     def on_rt_selected(self, idx):
-        # idx is global index
         print(f"[MainWindow] on_rt_selected -> {idx}")
         try:
             pos = next(i for i, r in enumerate(self.rows) if r["idx"] == idx)
@@ -70,35 +83,56 @@ class MainWindow(QtWidgets.QMainWindow):
         block = self.blocks[pos]
         inp = self.inputs[pos]
 
-        # update views; pass callback so signals can call back to select timeline
-        self.signals_tab.update_signals(
-            self.rows, self.inputs, idx, on_select_callback=self.select_rt
-        )
+        self.signals_tab.update_signals(self.rows, self.inputs, idx, on_select_callback=self.select_rt)
         self.context_tab.update_context(block)
         self.details_tab.update_details(inp, block)
-        # update compare with full rows and selected idx
         self.compare_tab.update_compare(self.rows, selected_idx=idx)
 
+        self.autoisf_tab.highlight_idx(idx)
+
     def select_rt(self, global_idx):
-        """
-        Called by SignalsView when user clicks on a point.
-        Also used internally to programmatically select timeline item.
-        """
         self.timeline.select_by_idx(global_idx)
-        # also trigger on_rt_selected to refresh views
         self.on_rt_selected(global_idx)
 
     def on_filters_changed(self, filters):
-        # debug: покажем в консоли, что MainWindow получил фильтры
         print(f"[MainWindow] on_filters_changed -> {filters}")
-        # apply filters to timeline
         self.timeline.apply_filters(self.rows, self.inputs, filters)
+
+    def load_logs_dialog(self):
+        dlg = QtWidgets.QFileDialog(self)
+        dlg.setNameFilter("ZIP files (*.zip)")
+        dlg.setFileMode(QtWidgets.QFileDialog.FileMode.ExistingFile)
+
+        if dlg.exec():
+            selected = dlg.selectedFiles()[0]
+            print("Выбран ZIP:", selected)
+
+            shutil.copy(selected, LOGS_ZIP)
+
+            self.rows, self.blocks, self.inputs = run_compare_on_all_logs(str(LOGS_PATH))
+
+            worst = set(load_worst_rows())
+            for r in self.rows:
+                r["is_worst"] = r["idx"] in worst
+
+            self.timeline.load(self.rows, self.inputs)
+            if self.rows:
+                self.select_rt(self.rows[0]["idx"])
+
+    def on_report_rebuilt(self):
+        print("Отчёт пересчитан — обновляем timeline")
+        self.rows, self.blocks, self.inputs = run_compare_on_all_logs(str(LOGS_PATH))
+
+        worst = set(load_worst_rows())
+        for r in self.rows:
+            r["is_worst"] = r["idx"] in worst
+
+        self.timeline.load(self.rows, self.inputs)
+        if self.rows:
+            self.select_rt(self.rows[0]["idx"])
 
 
 def enable_light_theme(app):
-    """
-    Устанавливает светлую тему с нейтральными контрастными цветами.
-    """
     palette = app.palette()
     palette.setColor(palette.ColorRole.Window, QtGui.QColor("#ffffff"))
     palette.setColor(palette.ColorRole.Base, QtGui.QColor("#ffffff"))
@@ -109,14 +143,16 @@ def enable_light_theme(app):
     palette.setColor(palette.ColorRole.HighlightedText, QtGui.QColor("#ffffff"))
     app.setPalette(palette)
 
-    # Optional: tweak default font sizes for readability
     font = app.font()
     font.setPointSize(10)
     app.setFont(font)
 
 
 def main():
-    app = QtWidgets.QApplication([])
+    if not sys.argv:
+        sys.argv = ["aaps_emulator"]
+
+    app = QtWidgets.QApplication(sys.argv)
     enable_light_theme(app)
     w = MainWindow()
     w.show()

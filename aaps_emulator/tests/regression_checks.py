@@ -77,14 +77,16 @@ def main():
             auto_isf_consoleLog=logs,
         )
         ref = reference[idx]
-        ev_ok = (
-            res.eventualBG is not None
-            and abs(res.eventualBG - ref["aaps_eventual"]) <= 0.5
-        )
+        ev_ok = res.eventualBG is not None and abs(res.eventualBG - ref["aaps_eventual"]) <= 0.5
         rate_ok = abs((res.rate or 0.0) - ref["aaps_rate"]) <= 1.0
         ins_ok = abs((res.insulinReq or 0.0) - ref["aaps_insreq"]) <= 0.5
         print(
-            f"idx {idx}: ref_ev={ref['aaps_eventual']} py_ev={res.eventualBG} ev_ok={ev_ok} rate_ref={ref['aaps_rate']} py_rate={res.rate} rate_ok={rate_ok} ins_ref={ref['aaps_insreq']} py_ins={res.insulinReq} ins_ok={ins_ok}"
+            msg=(
+                f"aaps_rate={ref['aaps_rate']} "
+                f"py_rate={res.rate} rate_ok={rate_ok} "
+                f"ins_ref={ref['aaps_insreq']} "
+                f"py_ins={res.insulinReq} ins_ok={ins_ok}"
+            )
         )
         if not (ev_ok and rate_ok and ins_ok):
             failures.append(idx)

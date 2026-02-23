@@ -5,11 +5,7 @@ import zipfile
 def find_all_zip_logs(logs_dir="logs"):
     if not os.path.exists(logs_dir):
         return []
-    return [
-        os.path.join(logs_dir, f)
-        for f in os.listdir(logs_dir)
-        if f.lower().endswith(".zip")
-    ]
+    return [os.path.join(logs_dir, f) for f in os.listdir(logs_dir) if f.lower().endswith(".zip")]
 
 
 def extract_zip(zip_path, out_dir=None):

@@ -1,4 +1,3 @@
-# aaps_emulator/gui/widgets/timeline_view.py
 from datetime import datetime
 
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -13,7 +12,6 @@ class TimelineView(QtWidgets.QWidget):
         v.setContentsMargins(4, 4, 4, 4)
         v.setSpacing(4)
 
-        # header: title + active filters label
         header_layout = QtWidgets.QHBoxLayout()
         self.title_label = QtWidgets.QLabel("<b>Timeline</b>")
         self.title_label.setToolTip("Список RT (результатов). Клик — выбрать RT.")
@@ -27,24 +25,16 @@ class TimelineView(QtWidgets.QWidget):
 
         v.addLayout(header_layout)
 
-        # the actual list
         self.list = QtWidgets.QListWidget()
         self.list.currentRowChanged.connect(self._on_row_changed)
-        self.list.setSelectionMode(
-            QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
-        )
+        self.list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         v.addWidget(self.list)
 
-        # internal state
         self._all_rows = []
         self._inputs = []
         self._index_map = []
 
     def load(self, rows, inputs):
-        """
-        rows: full list of row dicts (as returned by compare_runner)
-        inputs: full list of inputs (same order)
-        """
         self._all_rows = rows
         self._inputs = inputs
         indices = [r["idx"] for r in rows]
@@ -52,10 +42,6 @@ class TimelineView(QtWidgets.QWidget):
         self._update_filters_label({})
 
     def apply_filters(self, rows, inputs, filters):
-        """
-        rows, inputs: full lists (unfiltered)
-        filters: dict with keys autoisf_on, smb, high_delta, zip_name, time_range
-        """
         self._all_rows = rows
         self._inputs = inputs
 
@@ -112,14 +98,17 @@ class TimelineView(QtWidgets.QWidget):
             item_text = f"#{idx}  {ts_str}  AAPS {aaps_ev:.2f}  PY {py_ev:.2f}  [{row.get('zip_name', '')}]"
             item = QtWidgets.QListWidgetItem(item_text)
 
-            inp = self._inputs[pos] if pos < len(self._inputs) else None
-            if inp:
-                autosens = inp.get("autosens")
-                gs = inp.get("glucose_status")
-                if getattr(autosens, "ratio", 1.0) != 1.0:
-                    item.setBackground(QtGui.QColor("#e8f4ff"))
-                if gs and abs(gs.delta) >= 0.5:
-                    item.setForeground(QtGui.QColor("#b35900"))
+            if row.get("is_worst"):
+                item.setBackground(QtGui.QColor("#ffcccc"))
+            else:
+                inp = self._inputs[pos] if pos < len(self._inputs) else None
+                if inp:
+                    autosens = inp.get("autosens")
+                    gs = inp.get("glucose_status")
+                    if getattr(autosens, "ratio", 1.0) != 1.0:
+                        item.setBackground(QtGui.QColor("#e8f4ff"))
+                    if gs and abs(gs.delta) >= 0.5:
+                        item.setForeground(QtGui.QColor("#b35900"))
 
             self.list.addItem(item)
             self._index_map.append(idx)
@@ -132,22 +121,13 @@ class TimelineView(QtWidgets.QWidget):
         self.rt_selected.emit(idx)
 
     def select_by_idx(self, idx):
-        """
-        Programmatically select item by global idx.
-        If idx is not visible due to filters, temporarily ensure it is visible and select it.
-        """
         try:
             pos = self._index_map.index(idx)
             self.list.setCurrentRow(pos)
             return
         except ValueError:
-            # not visible — try to insert it at top of list (make visible)
-            print(
-                f"[TimelineView] select_by_idx: idx {idx} not visible, making it visible"
-            )
-            all_indices = [idx] + [
-                i for i in (r["idx"] for r in self._all_rows) if i != idx
-            ]
+            print(f"[TimelineView] select_by_idx: idx {idx} not visible, making it visible")
+            all_indices = [idx] + [i for i in (r["idx"] for r in self._all_rows) if i != idx]
             self._rebuild_items(all_indices)
             self.list.setCurrentRow(0)
             return

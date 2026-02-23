@@ -40,9 +40,7 @@ def main():
                 return 0.0
 
         rate_err.append(safe_float(row["aaps_rate"]) - safe_float(ref["aaps_rate"]))
-        ev_err.append(
-            safe_float(row["aaps_eventual"]) - safe_float(ref["aaps_eventual"])
-        )
+        ev_err.append(safe_float(row["aaps_eventual"]) - safe_float(ref["aaps_eventual"]))
         ins_err.append(safe_float(row["aaps_insreq"]) - safe_float(ref["aaps_insreq"]))
 
     print("RMSE eventual:", rmse(ev_err))

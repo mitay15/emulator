@@ -54,9 +54,7 @@ def load_reference_csv(path):
             try:
                 idx = int(str(idx_raw).strip())
             except Exception:
-                logger.exception(
-                    "compare_with_reference: skipping row due to exception"
-                )
+                logger.exception("compare_with_reference: skipping row due to exception")
                 continue
             rows[idx] = {
                 "ts_s": safe_int(rec.get("ts_s"), 0),
@@ -123,11 +121,7 @@ def main():
 
         compared += 1
         try:
-            ev_err = (
-                float(py_ev) - float(ref_ev)
-                if py_ev is not None
-                else float(ref_ev) * -1.0
-            )
+            ev_err = float(py_ev) - float(ref_ev) if py_ev is not None else float(ref_ev) * -1.0
             ev_errors.append(ev_err)
             if abs(ev_err) <= 0.5:
                 within_tol += 1

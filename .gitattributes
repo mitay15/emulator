@@ -1,0 +1,15 @@
+# Всегда LF для кода
+*.py text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+
+# Windows-friendly CRLF для текстов, если нужно
+*.txt text eol=crlf
+
+# Бинарники
+*.png binary
+*.jpg binary
+*.zip binary
+*.exe binary

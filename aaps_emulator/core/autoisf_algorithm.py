@@ -12,9 +12,9 @@ This file provides a defensive implementation of determine_basal_autoisf that:
  - returns AutoIsfResult(eventualBG, insulinReq, rate, duration)
 """
 
-from dataclasses import dataclass
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from aaps_emulator.core.rt_parser import extract_lowtemp_rate, parse_rt_to_dict

@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.pyo
+*.pyd
 
 # C extensions
 *.so
@@ -61,5 +64,11 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Project-specific
-aaps_emulator/logs/
+# Generated reports
+aaps_emulator/tests/*.html
+aaps_emulator/tests/*.csv
+aaps_emulator/tests/plots/
+
+# Logs
+aaps_emulator/logs/*
+!aaps_emulator/logs/.gitkeep

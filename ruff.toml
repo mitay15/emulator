@@ -3,28 +3,23 @@ target-version = "py311"
 
 [lint]
 select = [
-    "E",
-    "F",
-    "W",
-    "I",
-    "B",
-    "C4",
-    "S",
-    "UP",
+    "E", "F", "W", "B", "I", "UP", "S", "C4"
 ]
-
 ignore = [
-    "E501",
+    "S603", # subprocess allowed
+    "S607", # partial executable path allowed
+    "B023", # closure over loop variable allowed
+    "C408", # dict() literal not required
 ]
-
-[lint.isort]
-combine-as-imports = true
-force-sort-within-sections = true
-
-[lint.flake8-bandit]
-check-typed-exception = true
 
 [lint.per-file-ignores]
-"aaps_emulator/tests/*" = ["S101"]
+"**/autoisf_plotly_report.py" = ["E501"]
+"**/autoisf_html_report.py" = ["E501"]
+"**/autoisf_plots.py" = ["E501"]
+"tests/*.py" = ["S101"]
+"**/tests/*.py" = ["S101"]
 
-
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

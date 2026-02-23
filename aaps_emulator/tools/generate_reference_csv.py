@@ -60,12 +60,8 @@ def generate(out_path, logs_dir):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument(
-        "--out", default="tests/reference_generated.csv", help="Output CSV path"
-    )
-    p.add_argument(
-        "--logs", default="logs", help="Logs directory (relative to project root)"
-    )
+    p.add_argument("--out", default="tests/reference_generated.csv", help="Output CSV path")
+    p.add_argument("--logs", default="logs", help="Logs directory (relative to project root)")
     args = p.parse_args()
     generate(args.out, args.logs)
 
