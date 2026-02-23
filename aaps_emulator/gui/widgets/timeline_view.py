@@ -30,9 +30,7 @@ class TimelineView(QtWidgets.QWidget):
         # the actual list
         self.list = QtWidgets.QListWidget()
         self.list.currentRowChanged.connect(self._on_row_changed)
-        self.list.setSelectionMode(
-            QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
-        )
+        self.list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         v.addWidget(self.list)
 
         # internal state
@@ -142,12 +140,8 @@ class TimelineView(QtWidgets.QWidget):
             return
         except ValueError:
             # not visible — try to insert it at top of list (make visible)
-            print(
-                f"[TimelineView] select_by_idx: idx {idx} not visible, making it visible"
-            )
-            all_indices = [idx] + [
-                i for i in (r["idx"] for r in self._all_rows) if i != idx
-            ]
+            print(f"[TimelineView] select_by_idx: idx {idx} not visible, making it visible")
+            all_indices = [idx] + [i for i in (r["idx"] for r in self._all_rows) if i != idx]
             self._rebuild_items(all_indices)
             self.list.setCurrentRow(0)
             return

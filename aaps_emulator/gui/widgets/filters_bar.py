@@ -17,19 +17,13 @@ class FiltersBar(QtWidgets.QWidget):
 
         # checkboxes with clear labels and tooltips
         self.cb_autoisf = QtWidgets.QCheckBox("Показывать только AutoISF")
-        self.cb_autoisf.setToolTip(
-            "Показывать только RT, где AutoISF был активен (autosens.ratio != 1.0)"
-        )
+        self.cb_autoisf.setToolTip("Показывать только RT, где AutoISF был активен (autosens.ratio != 1.0)")
 
         self.cb_smb = QtWidgets.QCheckBox("Показывать только SMB")
-        self.cb_smb.setToolTip(
-            "Показывать только RT, где есть SMB (heuristic: insulinReq > 0)"
-        )
+        self.cb_smb.setToolTip("Показывать только RT, где есть SMB (heuristic: insulinReq > 0)")
 
         self.cb_high_delta = QtWidgets.QCheckBox("Показывать только High Δ")
-        self.cb_high_delta.setToolTip(
-            "Показывать только RT с большой скоростью изменения глюкозы (|Δ| ≥ 0.5 mmol/L)"
-        )
+        self.cb_high_delta.setToolTip("Показывать только RT с большой скоростью изменения глюкозы (|Δ| ≥ 0.5 mmol/L)")
 
         layout.addWidget(self.cb_autoisf)
         layout.addWidget(self.cb_smb)
@@ -60,18 +54,14 @@ class FiltersBar(QtWidgets.QWidget):
         layout.addWidget(QtWidgets.QLabel("С:"))
         self.time_from = QtWidgets.QDateTimeEdit()
         self.time_from.setCalendarPopup(True)
-        self.time_from.setToolTip(
-            "Начало временного диапазона (используется только если включён флажок)"
-        )
+        self.time_from.setToolTip("Начало временного диапазона (используется только если включён флажок)")
         self.time_from.setFixedWidth(160)
         layout.addWidget(self.time_from)
 
         layout.addWidget(QtWidgets.QLabel("По:"))
         self.time_to = QtWidgets.QDateTimeEdit()
         self.time_to.setCalendarPopup(True)
-        self.time_to.setToolTip(
-            "Конец временного диапазона (используется только если включён флажок)"
-        )
+        self.time_to.setToolTip("Конец временного диапазона (используется только если включён флажок)")
         self.time_to.setFixedWidth(160)
         layout.addWidget(self.time_to)
 
