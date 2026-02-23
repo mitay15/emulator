@@ -77,7 +77,10 @@ def main():
             auto_isf_consoleLog=logs,
         )
         ref = reference[idx]
-        ev_ok = res.eventualBG is not None and abs(res.eventualBG - ref["aaps_eventual"]) <= 0.5
+        ev_ok = (
+            res.eventualBG is not None
+            and abs(res.eventualBG - ref["aaps_eventual"]) <= 0.5
+        )
         rate_ok = abs((res.rate or 0.0) - ref["aaps_rate"]) <= 1.0
         ins_ok = abs((res.insulinReq or 0.0) - ref["aaps_insreq"]) <= 0.5
         print(
