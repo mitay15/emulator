@@ -9,7 +9,7 @@ from aaps_emulator.parsing.context_parsers import (
     parse_meal,
     parse_profile,
 )
-from aaps_emulator.parsing.rt_parser import normalize_rt, parse_rt
+from aaps_emulator.parsing.rt_parser import normalize_rt
 
 
 def build_inputs(block):
