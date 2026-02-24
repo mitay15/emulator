@@ -20,6 +20,7 @@ def parse_rt(rt_line):
         "variable_sens": get("variable_sens") or get("variableSens"),
     }
 
+
 def normalize_rt(rt_obj):
     """
     Normalize RT input (string or dict) to a dict with snake_case keys and
@@ -60,29 +61,22 @@ def normalize_rt(rt_obj):
         "eventualBG": "eventual_bg",
         "eventual_bg": "eventual_bg",
         "eventual": "eventual_bg",
-
         "targetBG": "target_bg",
         "target_bg": "target_bg",
-
         "insulinReq": "insulin_req",
         "insulin_req": "insulin_req",
-
         "duration": "duration",
         "dur": "duration",
-
         "rate": "rate",
         "deliveryRate": "rate",
-
         "IOB": "iob",
         "iob": "iob",
-
         # 🔥 ВСЕ варианты variableSens
         "variable_sens": "variable_sens",
         "variableSens": "variable_sens",
         "variableSens ": "variable_sens",
         "variable-sens": "variable_sens",
         "variableSens=": "variable_sens",
-
         "sensitivityRatio": "sensitivity_ratio",
         "sensitivity_ratio": "sensitivity_ratio",
     }

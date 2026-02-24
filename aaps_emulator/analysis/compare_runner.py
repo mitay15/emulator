@@ -86,6 +86,7 @@ def run_compare_on_all_logs(logs_dir="logs"):
 
     return all_rows, all_blocks, all_inputs
 
+
 def run_compare_on_log(log_path, out_csv_path):
     """
     Обрабатывает один обычный лог-файл (НЕ ZIP).
@@ -151,6 +152,7 @@ def run_compare_on_log(log_path, out_csv_path):
 
     # Записываем CSV
     import csv
+
     with open(out_csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(all_rows[0].keys()))
         writer.writeheader()

@@ -66,4 +66,3 @@ def plot_error_heatmap(rows, bin_by="hour", out_path: str | Path | None = None):
         return out_path
 
     return fig
-
