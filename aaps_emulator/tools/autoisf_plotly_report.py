@@ -107,16 +107,16 @@ def main():
         from plotly.subplots import make_subplots
     except Exception as e:
         logger.exception("plotly import failed: %s", e)
-        print("Plotly not available; cannot build plotly report.")
+        logger.error("Plotly not available; cannot build plotly report.")
         return
 
     if not DIFFS_PATH.exists():
-        print("No diffs file:", DIFFS_PATH)
+        logger.info("No diffs file: %s", DIFFS_PATH)
         return
 
     diffs = load_diffs(DIFFS_PATH)
     if not diffs:
-        print("No rows in diffs file:", DIFFS_PATH)
+        logger.info("No rows in diffs file: %s", DIFFS_PATH)
         return
 
     worst_idx = set(load_worst(WORST_PATH))
@@ -382,7 +382,7 @@ def main():
     full_html = _build_html_template(content)
 
     HTML_OUT.write_text(full_html, encoding="utf-8")
-    print("Plotly HTML report written to:", HTML_OUT)
+    logger.info("Plotly HTML report written to: %s", HTML_OUT)
 
 
 if __name__ == "__main__":

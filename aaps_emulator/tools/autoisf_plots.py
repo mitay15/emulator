@@ -1,5 +1,8 @@
 import csv
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # make PLOTS_DIR relative to package root
 BASE = Path(__file__).resolve().parent.parent
@@ -97,7 +100,7 @@ def plot_scatter_rate(rows, out_path: Path | None = None):
     pairs = [(r["aaps_rate"], r["py_rate"]) for r in rows if r["aaps_rate"] is not None and r["py_rate"] is not None]
 
     if not pairs:
-        print("No valid rate pairs for scatter plot")
+        logger.info("No valid rate pairs for scatter plot")
         return
 
     aaps_rates = [p[0] for p in pairs]
@@ -133,7 +136,7 @@ def main():
     plot_diffs(rows)
     plot_scatter_rate(rows)
 
-    print("Plots saved to:", PLOTS_DIR)
+    logger.info("Plots saved to: %s", PLOTS_DIR)
 
 
 if __name__ == "__main__":
