@@ -1,7 +1,7 @@
 # aaps_emulator/tools/autoisf_plotly_report.py
-from pathlib import Path
 import csv
 import logging
+from pathlib import Path
 
 DIFFS_PATH = Path("aaps_emulator/tests/diffs_with_inputs.csv")
 WORST_PATH = Path("aaps_emulator/tests/autoisf_worst.csv")
