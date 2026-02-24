@@ -1,5 +1,5 @@
 from pathlib import Path
-from aaps_emulator.compare.compare_runner import run_compare_on_log
+from aaps_emulator.tools.compare_runner import run_compare_on_log
 
 
 def test_compare_runner_smoke(tmp_path):
