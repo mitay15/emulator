@@ -1,18 +1,13 @@
-import csv
+# aaps_emulator/tools/autoisf_plotly_report.py
 from pathlib import Path
-
-import plotly.graph_objs as go
-from plotly.offline import plot as plot_offline
-from plotly.subplots import make_subplots
-
-from aaps_emulator.analysis.compare_runner import run_compare_on_all_logs
-from aaps_emulator.config import LOGS_PATH
-
-rows, blocks, inputs = run_compare_on_all_logs(str(LOGS_PATH))
+import csv
+import logging
 
 DIFFS_PATH = Path("aaps_emulator/tests/diffs_with_inputs.csv")
 WORST_PATH = Path("aaps_emulator/tests/autoisf_worst.csv")
 HTML_OUT = Path("aaps_emulator/tests/autoisf_plotly_report.html")
+
+logger = logging.getLogger(__name__)
 
 
 def load_diffs(path: Path):
@@ -30,22 +25,26 @@ def load_diffs(path: Path):
                 except Exception:
                     return None
 
-            rows.append(
-                {
-                    "idx": int(row["idx"]),
-                    "ts": float(row["ts_s"]),
-                    "aaps_rate": fget("aaps_rate_ref"),
-                    "py_rate": fget("py_rate"),
-                    "aaps_eventual": fget("aaps_eventual_ref"),
-                    "py_eventual": fget("py_eventual"),
-                    "diff_eventual": fget("err_ev"),
-                    "bg": fget("bg"),
-                    "delta": fget("delta"),
-                    "autosens_ratio": fget("autosens_ratio"),
-                    "profile_sens": fget("profile_sens"),
-                    "profile_basal": fget("profile_basal"),
-                }
-            )
+            try:
+                rows.append(
+                    {
+                        "idx": int(row["idx"]),
+                        "ts": float(row["ts_s"]),
+                        "aaps_rate": fget("aaps_rate_ref"),
+                        "py_rate": fget("py_rate"),
+                        "aaps_eventual": fget("aaps_eventual_ref"),
+                        "py_eventual": fget("py_eventual"),
+                        "diff_eventual": fget("err_ev"),
+                        "bg": fget("bg"),
+                        "delta": fget("delta"),
+                        "autosens_ratio": fget("autosens_ratio"),
+                        "profile_sens": fget("profile_sens"),
+                        "profile_basal": fget("profile_basal"),
+                    }
+                )
+            except Exception:
+                logger.exception("load_diffs: skipping malformed row")
+                continue
     return rows
 
 
@@ -64,12 +63,62 @@ def load_worst(path: Path):
     return rows
 
 
+def _build_html_template(content: str) -> str:
+    # Your HTML with qwebchannel and pybridge integration (keeps your JS)
+    return f"""<html>
+<head>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script>
+    var pybridge = null;
+    new QWebChannel(qt.webChannelTransport, function(channel) {{
+        pybridge = channel.objects.pybridge;
+    }});
+    </script>
+    <meta charset="utf-8" />
+    <title>AutoISF Plotly Report</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+{content}
+<script>
+document.addEventListener("DOMContentLoaded", function() {{
+    let plots = document.getElementsByClassName("plotly-graph-div");
+    for (let p of plots) {{
+        // attach click handler via Plotly events
+        p.on('plotly_click', function(data) {{
+            let txt = data.points[0].text;
+            if (txt && pybridge) {{
+                let idx = parseInt(txt.replace("idx=", ""));
+                pybridge.selectIdx(idx);
+            }}
+        }});
+    }}
+}});
+</script>
+</body>
+</html>"""
+
+
 def main():
+    # heavy imports inside main to avoid side effects on import
+    try:
+        import plotly.graph_objs as go
+        from plotly.offline import plot as plot_offline
+        from plotly.subplots import make_subplots
+    except Exception as e:
+        logger.exception("plotly import failed: %s", e)
+        print("Plotly not available; cannot build plotly report.")
+        return
+
     if not DIFFS_PATH.exists():
         print("No diffs file:", DIFFS_PATH)
         return
 
     diffs = load_diffs(DIFFS_PATH)
+    if not diffs:
+        print("No rows in diffs file:", DIFFS_PATH)
+        return
+
     worst_idx = set(load_worst(WORST_PATH))
 
     # --- Scatter rate with worst-case labels ---
@@ -330,42 +379,7 @@ def main():
     html_parts.append(plot_offline(fig_basal, include_plotlyjs=False, output_type="div"))
 
     content = "".join(html_parts)
-
-    full_html = """
-<html>
-<head>
-    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
-    <script>
-    var pybridge = null;
-    new QWebChannel(qt.webChannelTransport, function(channel) {
-        pybridge = channel.objects.pybridge;
-    });
-    </script>
-    <meta charset="utf-8" />
-    <title>AutoISF Plotly Report</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-</head>
-<body>
-__CONTENT_PLACEHOLDER__
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    let plots = document.getElementsByClassName("plotly-graph-div");
-    for (let p of plots) {
-        p.on('plotly_click', function(data) {
-            let txt = data.points[0].text;
-            if (txt && pybridge) {
-                let idx = parseInt(txt.replace("idx=", ""));
-                pybridge.selectIdx(idx);
-            }
-        });
-    }
-});
-</script>
-</body>
-</html>
-"""
-
-    full_html = full_html.replace("__CONTENT_PLACEHOLDER__", content)
+    full_html = _build_html_template(content)
 
     HTML_OUT.write_text(full_html, encoding="utf-8")
     print("Plotly HTML report written to:", HTML_OUT)

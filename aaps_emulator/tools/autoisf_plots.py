@@ -1,10 +1,10 @@
 import csv
 from pathlib import Path
 
-import matplotlib.pyplot as plt
-
-DIFFS_PATH = Path("aaps_emulator/tests/diffs_with_inputs.csv")
-PLOTS_DIR = Path("aaps_emulator/tests/plots")
+# make PLOTS_DIR relative to package root
+BASE = Path(__file__).resolve().parent.parent
+DIFFS_PATH = BASE / "tests" / "diffs_with_inputs.csv"
+PLOTS_DIR = BASE / "tests" / "plots"
 
 
 def load_diffs():
@@ -36,7 +36,9 @@ def load_diffs():
     return rows
 
 
-def plot_rate(rows):
+def plot_rate(rows, out_path: Path | None = None):
+    import matplotlib.pyplot as plt
+
     plt.figure(figsize=(12, 5))
     plt.plot([r["ts"] for r in rows], [r["aaps_rate"] for r in rows], label="AAPS rate")
     plt.plot([r["ts"] for r in rows], [r["py_rate"] for r in rows], label="Python rate", linestyle="--")
@@ -46,11 +48,16 @@ def plot_rate(rows):
     plt.ylabel("U/h")
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(PLOTS_DIR / "rate_compare.png")
+
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    target = out_path or (PLOTS_DIR / "rate_compare.png")
+    plt.savefig(target)
     plt.close()
 
 
-def plot_eventual(rows):
+def plot_eventual(rows, out_path: Path | None = None):
+    import matplotlib.pyplot as plt
+
     plt.figure(figsize=(12, 5))
     plt.plot([r["ts"] for r in rows], [r["aaps_eventual"] for r in rows], label="AAPS eventualBG")
     plt.plot([r["ts"] for r in rows], [r["py_eventual"] for r in rows], label="Python eventualBG", linestyle="--")
@@ -60,11 +67,16 @@ def plot_eventual(rows):
     plt.ylabel("mmol/L")
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(PLOTS_DIR / "eventual_compare.png")
+
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    target = out_path or (PLOTS_DIR / "eventual_compare.png")
+    plt.savefig(target)
     plt.close()
 
 
-def plot_diffs(rows):
+def plot_diffs(rows, out_path: Path | None = None):
+    import matplotlib.pyplot as plt
+
     plt.figure(figsize=(12, 5))
     plt.plot([r["ts"] for r in rows], [r["diff_eventual"] for r in rows], label="diff eventualBG")
     plt.legend()
@@ -73,11 +85,14 @@ def plot_diffs(rows):
     plt.ylabel("mmol/L")
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(PLOTS_DIR / "diff_eventual.png")
+
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    target = out_path or (PLOTS_DIR / "diff_eventual.png")
+    plt.savefig(target)
     plt.close()
 
 
-def plot_scatter_rate(rows):
+def plot_scatter_rate(rows, out_path: Path | None = None):
     # Берём только строки, где оба значения существуют
     pairs = [(r["aaps_rate"], r["py_rate"]) for r in rows if r["aaps_rate"] is not None and r["py_rate"] is not None]
 
@@ -88,20 +103,25 @@ def plot_scatter_rate(rows):
     aaps_rates = [p[0] for p in pairs]
     py_rates = [p[1] for p in pairs]
 
-    plt.figure(figsize=(6, 6))
-    plt.scatter(aaps_rates, py_rates, s=10)
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.scatter(aaps_rates, py_rates, s=10)
 
     # диагональ
     m = max(max(aaps_rates), max(py_rates))
-    plt.plot([0, m], [0, m], color="red")
+    ax.plot([0, m], [0, m], color="red")
 
-    plt.title("Scatter: AAPS rate vs Python rate")
-    plt.xlabel("AAPS rate")
-    plt.ylabel("Python rate")
-    plt.grid(True)
+    ax.set_title("Scatter: AAPS rate vs Python rate")
+    ax.set_xlabel("AAPS rate")
+    ax.set_ylabel("Python rate")
+    ax.grid(True)
     plt.tight_layout()
-    plt.savefig(PLOTS_DIR / "scatter_rate.png")
-    plt.close()
+
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    target = out_path or (PLOTS_DIR / "scatter_rate.png")
+    fig.savefig(target)
+    plt.close(fig)
 
 
 def main():
