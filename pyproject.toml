@@ -1,26 +1,54 @@
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "aaps_emulator"
-version = "0.1.0"
-description = "AAPS algorithm emulator and analysis tools"
+name = "aaps-emulator"
+version = "0.0.0"
+description = "AAPS Emulator"
 authors = [
     { name = "Dimas" }
 ]
 readme = "README.md"
-requires-python = ">=3.10"
-
-# Если будут зависимости — добавим сюда
+requires-python = ">=3.11"
 dependencies = []
 
-[tool.setuptools]
-package-dir = {"" = "."}
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-include = ["aaps_emulator*"]
+# ---------------------------------------------------------
+# semantic-release (единственный блок!)
+# ---------------------------------------------------------
+[tool.semantic_release]
+version_variable = "aaps_emulator/__init__.py:__version__"
+branch = "master"
+upload_to_pypi = true
+upload_to_release = true
+changelog_file = "CHANGELOG.md"
+commit_parser = "angular"
 
-[tool.pytest.ini_options]
-pythonpath = ["."]
-testpaths = ["aaps_emulator/tests"]
+[tool.semantic_release.pypi]
+username = "__token__"
+password = "env:PYPI_TOKEN"
+
+# ---------------------------------------------------------
+# Ruff
+# ---------------------------------------------------------
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "C4"]
+
+# ---------------------------------------------------------
+# Black
+# ---------------------------------------------------------
+[tool.black]
+line-length = 120
+target-version = ["py311"]
+
+# ---------------------------------------------------------
+# Mypy
+# ---------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
