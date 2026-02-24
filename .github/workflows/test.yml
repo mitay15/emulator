@@ -19,14 +19,14 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements-dev.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install tools
+      - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install ruff mypy pytest
+          pip install -r requirements-dev.txt
           pip install .
 
       - name: Ruff lint
@@ -53,14 +53,18 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements-dev.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
-          pip install pytest coverage
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
           pip install .
+
+      - name: Set matplotlib backend
+        run: echo "MPLBACKEND=Agg" >> $GITHUB_ENV
 
       - name: Run tests
         run: coverage run -m pytest -q
