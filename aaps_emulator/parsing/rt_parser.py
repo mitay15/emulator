@@ -17,7 +17,7 @@ def parse_rt(rt_line):
         "duration": int(get("duration") or 0),
         "rate": get("rate"),
         "iob": get("IOB"),
-        "variable_sens": get("variable_sens"),
+        "variable_sens": get("variable_sens") or get("variableSens"),
     }
 
 def normalize_rt(rt_obj):
@@ -49,6 +49,7 @@ def normalize_rt(rt_obj):
         # use existing parse_rt to extract basic numeric fields from a string
         parsed.update(parse_rt(str(rt_obj)))
         parsed["_raw_text"] = str(rt_obj).lower()
+        print("DEBUG PARSED =", parsed)
 
     out: dict = {}
 
@@ -149,4 +150,5 @@ def normalize_rt(rt_obj):
     except Exception:
         out["sensitivity_ratio"] = None
 
+    print("DEBUG OUT =", out)
     return out
