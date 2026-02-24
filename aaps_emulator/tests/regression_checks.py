@@ -9,8 +9,8 @@ import argparse
 import csv
 import logging
 
-from analysis.compare_runner import run_compare_on_all_logs
-from core.autoisf_algorithm import determine_basal_autoisf
+from aaps_emulator.analysis.compare_runner import run_compare_on_all_logs
+from aaps_emulator.core.autoisf_algorithm import determine_basal_autoisf
 
 logger = logging.getLogger(__name__)
 
@@ -81,12 +81,10 @@ def main():
         rate_ok = abs((res.rate or 0.0) - ref["aaps_rate"]) <= 1.0
         ins_ok = abs((res.insulinReq or 0.0) - ref["aaps_insreq"]) <= 0.5
         print(
-            msg=(
-                f"aaps_rate={ref['aaps_rate']} "
-                f"py_rate={res.rate} rate_ok={rate_ok} "
-                f"ins_ref={ref['aaps_insreq']} "
-                f"py_ins={res.insulinReq} ins_ok={ins_ok}"
-            )
+            f"aaps_rate={ref['aaps_rate']} "
+            f"py_rate={res.rate} rate_ok={rate_ok} "
+            f"ins_ref={ref['aaps_insreq']} "
+            f"py_ins={res.insulinReq} ins_ok={ins_ok}"
         )
         if not (ev_ok and rate_ok and ins_ok):
             failures.append(idx)

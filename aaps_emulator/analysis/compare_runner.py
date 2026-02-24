@@ -63,17 +63,19 @@ def run_compare_on_all_logs(logs_dir="logs"):
                 ts_m = re.search(r"timestamp=(\d+)", b["rt"])
                 ts_s = int(int(ts_m.group(1)) / 1000) if ts_m else 0
 
+                rt_in = inputs.get("rt") or {}
                 row = {
                     "idx": idx,
                     "ts_s": ts_s,
                     "zip_name": zip_name,
-                    "aaps_eventual": (inputs["rt"].get("eventualBG") or 0) / 18.0,
+                    # inputs["rt"] is normalized: eventual_bg is mmol/L already
+                    "aaps_eventual": rt_in.get("eventual_bg") if rt_in.get("eventual_bg") is not None else 0.0,
                     "py_eventual": result.eventualBG,
-                    "aaps_rate": inputs["rt"].get("rate"),
+                    "aaps_rate": rt_in.get("rate"),
                     "py_rate": result.rate,
-                    "aaps_duration": inputs["rt"].get("duration"),
+                    "aaps_duration": rt_in.get("duration"),
                     "py_duration": result.duration,
-                    "aaps_insreq": inputs["rt"].get("insulinReq"),
+                    "aaps_insreq": rt_in.get("insulin_req"),
                     "py_insreq": result.insulinReq,
                 }
 

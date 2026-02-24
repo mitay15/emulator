@@ -40,6 +40,8 @@ class TempBasal:
 
 # --- helpers ---
 def rmse(values):
+    if not values:
+        return float("nan")
     return math.sqrt(sum(v * v for v in values) / len(values))
 
 

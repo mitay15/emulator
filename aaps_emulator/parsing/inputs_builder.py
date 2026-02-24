@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from aaps_emulator.core.autoisf_structs import OapsProfileAutoIsf
 from aaps_emulator.parsing.context_parsers import (
     parse_autosens,
@@ -7,12 +9,12 @@ from aaps_emulator.parsing.context_parsers import (
     parse_meal,
     parse_profile,
 )
-from aaps_emulator.parsing.rt_parser import parse_rt
+from aaps_emulator.parsing.rt_parser import normalize_rt, parse_rt
 
 
 def build_inputs(block):
     ctx = block["context"]
-    rt = parse_rt(block["rt"])
+    rt = normalize_rt(block["rt"])
 
     gs = parse_glucose_status(ctx)
     temp = parse_current_temp(ctx)
@@ -24,17 +26,23 @@ def build_inputs(block):
     if not gs:
         return None
 
-    if prof and (prof.variable_sens is None or prof.variable_sens == 0):
-        if rt["variable_sens"] is not None:
-            prof.variable_sens = rt["variable_sens"] / 18.0
+    # rt is normalized: variable_sens (if present) is numeric and already in expected units
+    if prof and (getattr(prof, "variable_sens", None) is None or getattr(prof, "variable_sens", 0) == 0):
+        if rt.get("variable_sens") is not None:
+            prof.variable_sens = float(rt["variable_sens"])
+
+    # use normalized target_bg (mmol/L) if present, else default 100 mg/dL -> 100/18 mmol/L
+    target_bg_rt = rt.get("target_bg")
+    if target_bg_rt is None:
+        target_bg_rt = 100.0 / 18.0
 
     if prof:
-        prof.target_bg = (rt["targetBG"] or 100) / 18.0
+        prof.target_bg = float(target_bg_rt)
     else:
         prof = OapsProfileAutoIsf(
             min_bg=4.0,
             max_bg=8.0,
-            target_bg=(rt["targetBG"] or 100) / 18.0,
+            target_bg=float(target_bg_rt),
             sens=6.0,
             carb_ratio=15,
             current_basal=0.5,

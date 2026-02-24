@@ -11,7 +11,9 @@ WORST_CSV_PATH = Path("aaps_emulator/tests/autoisf_worst.csv")
 
 
 def rmse(values: list[float]) -> float:
-    return math.sqrt(sum(v * v for v in values) / len(values)) if values else float("nan")
+    if not values:
+        return float("nan")
+    return math.sqrt(sum(v * v for v in values) / len(values))
 
 
 def load_diffs(path: Path) -> list[dict]:
@@ -157,7 +159,7 @@ def main() -> None:
         lines.append(
             f"idx={idx:5d}  score={score:.6f}  "
             f"diff_eventual={r['_diff_eventual']:.6f}  "
-            f"diff_insreq={r['_diff_insreq']:.66f}  "
+            f"diff_insreq={r['_diff_insreq']:.6f}  "
             f"diff_rate={r['_diff_rate']:.6f}  "
             f"diff_duration={r['_diff_duration']:.6f}"
         )

@@ -153,6 +153,20 @@ def determine_basal_autoisf(
     """
     tc = TraceCollector() if trace_mode else None
 
+    # ensure rt is normalized dict with snake_case keys
+    try:
+        from aaps_emulator.parsing.rt_parser import normalize_rt
+
+        if rt is not None:
+            # normalize strings and dicts to canonical snake_case/mmol values
+            rt = normalize_rt(rt)
+    except Exception as exc:
+        # keep original rt but record the issue for diagnostics
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.debug("normalize_rt not applied: %s", exc)
+
     if auto_isf_consoleError is None:
         auto_isf_consoleError = []
     if auto_isf_consoleLog is None:
