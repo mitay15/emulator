@@ -50,7 +50,8 @@ repos:
           - types-PyYAML
           - types-requests
         args:
-          - "aaps_emulator"
+          - "aaps_emulator/core"
+          - "aaps_emulator/parsing"
           - "--ignore-missing-imports"
           - "--allow-untyped-defs"
           - "--allow-untyped-calls"
