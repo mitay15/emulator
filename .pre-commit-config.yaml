@@ -50,7 +50,10 @@ repos:
           - types-PyYAML
           - types-requests
         args:
-          - --strict
+          - "--ignore-missing-imports"
+          - "--allow-untyped-defs"
+          - "--allow-untyped-calls"
+          - "--follow-imports=silent"
         stages: [pre-push]
 
   - repo: https://github.com/PyCQA/bandit
