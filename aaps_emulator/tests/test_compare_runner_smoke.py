@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from aaps_emulator.analysis.compare_runner import run_compare_on_all_logs
 
 

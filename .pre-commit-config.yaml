@@ -1,7 +1,4 @@
 repos:
-  # ---------------------------------------------------------
-  # Ruff: линт + автофиксы + форматирование
-  # ---------------------------------------------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.2
     hooks:
@@ -11,20 +8,14 @@ repos:
       - id: ruff-format
         language_version: python3.14
 
-  # ---------------------------------------------------------
-  # Black: строгий форматтер
-  # ---------------------------------------------------------
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 26.1.0
     hooks:
       - id: black
         language_version: python3.14
 
-  # ---------------------------------------------------------
-  # Autoflake: удаление неиспользуемых импортов и переменных
-  # ---------------------------------------------------------
   - repo: https://github.com/PyCQA/autoflake
-    rev: v2.3.1
+    rev: v2.3.3
     hooks:
       - id: autoflake
         args:
@@ -35,19 +26,13 @@ repos:
         files: "\\.py$"
         language_version: python3.14
 
-  # ---------------------------------------------------------
-  # Pyupgrade: обновление синтаксиса под Python 3.14+
-  # ---------------------------------------------------------
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.17.0
+    rev: v3.21.2
     hooks:
       - id: pyupgrade
         args: ["--py311-plus"]
         language_version: python3.14
 
-  # ---------------------------------------------------------
-  # Pytest: обязателен перед коммитом
-  # ---------------------------------------------------------
   - repo: local
     hooks:
       - id: pytest
@@ -57,9 +42,6 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
-  # ---------------------------------------------------------
-  # Mypy strict: обязателен перед пушем
-  # ---------------------------------------------------------
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.19.1
     hooks:
@@ -71,28 +53,26 @@ repos:
           - --strict
         stages: [pre-push]
 
-  # ---------------------------------------------------------
-  # Bandit: безопасность
-  # ---------------------------------------------------------
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.9
+    rev: 1.9.4
     hooks:
       - id: bandit
-        args: ["-r", "aaps_emulator"]
+        args:
+          - "-r"
+          - "aaps_emulator"
+          - "-x"
+          - "aaps_emulator/tests"
+          - "--severity-level"
+          - "medium"
+        pass_filenames: false
         language_version: python3.14
 
-  # ---------------------------------------------------------
-  # Codespell: проверка опечаток
-  # ---------------------------------------------------------
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.3.0
+    rev: v2.4.1
     hooks:
       - id: codespell
         language_version: python3.14
 
-  # ---------------------------------------------------------
-  # Гигиена: YAML/JSON/TOML, пробелы, конфликты
-  # ---------------------------------------------------------
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:

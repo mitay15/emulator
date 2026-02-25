@@ -2,21 +2,31 @@
 """
 AutoISF algorithm utilities.
 
-This file provides a defensive implementation of determine_basal_autoisf that:
- - accepts optional rt (runtime) predictions and extracts eventualBG from them when available
- - safely handles missing bg/delta values
- - uses autosens ratio and sensitivityRatio from rt when present
- - converts mg/dL -> mmol/L when appropriate (threshold-based)
- - computes insulinReq and maps it to rate with safeguards (duration, SMB scaling, caps)
- - prioritizes explicit RT-provided insulinReq/rate and respects RT signals that disable SMB
- - returns AutoIsfResult(eventualBG, insulinReq, rate, duration)
+Этот модуль даёт «защитную» реализацию determine_basal_autoisf, которая:
+ - принимает опциональный rt (runtime) и вытаскивает eventualBG, если он есть
+ - безопасно обрабатывает отсутствие bg/delta
+ - использует autosens ratio и sensitivityRatio из rt, если они есть
+ - при необходимости конвертирует mg/dL -> mmol/L
+ - считает insulinReq и переводит его в rate с защитами (duration, SMB scaling, лимиты)
+ - приоритетно уважает insulinReq/rate из RT и сигналы RT об отключении SMB/базала
+ - возвращает AutoIsfResult(eventualBG, insulinReq, rate, duration)
 """
 
 import logging
 import re
+import time
 from dataclasses import dataclass
 from typing import Any
 
+from aaps_emulator.core.cob_uam_pred import build_pred_from_rt_lists, build_uam_pred, simple_cob_absorption
+from aaps_emulator.core.eventual_insulin_rate import (
+    apply_basal_limits,
+    combine_pred_curves,
+    insulin_required_from_eventual,
+    mgdl_to_mmol,
+    rate_from_insulinReq,
+)
+from aaps_emulator.core.iob_openaps import InsulinEventSimple, compute_iob_openaps
 from aaps_emulator.core.rt_parser import extract_lowtemp_rate, parse_rt_to_dict
 
 logger = logging.getLogger(__name__)
@@ -53,14 +63,15 @@ def trace(tc: TraceCollector | None, name: str, value: Any) -> None:
 
 def _extract_predicted_eventual_from_rt(rt_obj: Any) -> float | None:
     """
-    Try to extract predicted eventualBG from rt object (dict or string).
-    Returns eventualBG in mmol/L or None.
+    Пытаемся вытащить eventualBG из rt (dict или строка).
+    Возвращаем eventualBG в mmol/L или None.
 
-    Handles:
-      - dict with keys 'eventualBG', 'eventual_bg', 'predBGs', 'predictions'
-      - string logs containing 'eventualBG=NNN' or 'Eventual BG N,N' patterns
+    Обрабатываем:
+      - dict с ключами 'eventualBG', 'eventual_bg', 'eventual'
+      - dict с 'predBGs' / 'predictions' / 'preds'
+      - строку с 'eventualBG=NNN' или 'eventual bg 14,2'
 
-    If value looks like mg/dL (>30), convert to mmol/L by dividing by 18.
+    Если значение похоже на mg/dL (>30), делим на 18.
     """
     if not rt_obj:
         return None
@@ -89,10 +100,9 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> float | None:
 
         return None
 
-    # string-like rt (parse eventualBG=NNN or "Eventual BG 14,2")
+    # string-like rt
     try:
         s = str(rt_obj)
-        # try key=value first
         marker = "eventualBG="
         if marker in s:
             part = s.split(marker, 1)[1]
@@ -108,7 +118,6 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> float | None:
                     return val / 18.0
                 return val
 
-        # try "Eventual BG 14,2" or "EventualBG is 14.2"
         m = re.search(r"eventual\s*bg\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)", s, flags=re.IGNORECASE)
         if m:
             val = float(m.group(1).replace(",", "."))
@@ -128,7 +137,7 @@ def determine_basal_autoisf(
     profile,
     autosens_data,
     meal_data,
-    rt=None,  # optional: pass rt dict/string if available
+    rt=None,
     microBolusAllowed=False,
     currentTime=0,
     flatBGsDetected=False,
@@ -144,27 +153,16 @@ def determine_basal_autoisf(
 ):
     """
     Defensive AutoISF calculation.
-
-    - Uses rt predictions when available (rt may be dict or string).
-    - Falls back to bg + delta*30 projection when no predictions.
-    - Uses autosens_data.ratio or sensitivityRatio from rt when present.
-    - Prioritizes RT-provided insulinReq/rate and respects RT disable signals.
-    - Returns AutoIsfResult(eventualBG, insulinReq, rate, duration).
     """
     tc = TraceCollector() if trace_mode else None
 
-    # ensure rt is normalized dict with snake_case keys
+    # нормализуем rt в dict со snake_case и mmol
     try:
         from aaps_emulator.parsing.rt_parser import normalize_rt
 
         if rt is not None:
-            # normalize strings and dicts to canonical snake_case/mmol values
             rt = normalize_rt(rt)
     except Exception as exc:
-        # keep original rt but record the issue for diagnostics
-        import logging
-
-        logger = logging.getLogger(__name__)
         logger.debug("normalize_rt not applied: %s", exc)
 
     if auto_isf_consoleError is None:
@@ -189,7 +187,7 @@ def determine_basal_autoisf(
         return res
 
     try:
-        # ensure bg and delta are defined early and safely
+        # bg и delta
         try:
             bg = getattr(glucose_status, "glucose", None)
         except Exception:
@@ -202,7 +200,7 @@ def determine_basal_autoisf(
         trace(tc, "bg", bg)
         trace(tc, "delta", delta)
 
-        # 1) Try to get predicted eventualBG from rt/predictions if available
+        # 1) eventualBG из rt
         eventualBG = None
         rt_obj = rt
 
@@ -212,9 +210,8 @@ def determine_basal_autoisf(
                 eventualBG = ev_from_rt
                 auto_isf_consoleLog.append(f"Using predicted eventualBG from rt: {eventualBG:.3f} mmol/L")
 
-        # 2) fallback to simple delta projection if no predictions
+        # 2) fallback: bg + delta*30
         if eventualBG is None:
-            # convert bg units if needed (mg/dL -> mmol/L)
             if bg is not None and bg > 50:
                 bg = bg / 18.0
                 auto_isf_consoleLog.append(f"Converted BG from mg/dL to mmol/L: {bg:.3f}")
@@ -235,7 +232,200 @@ def determine_basal_autoisf(
 
         trace(tc, "eventualBG", eventualBG)
 
-        # compute autosens ratio using provided autosens_data if present
+        # --- RT pre-checks and duration calculation (keep before diagnostics) ---
+        parsed_rt = parse_rt_to_dict(rt_obj)
+        trace(tc, "parsed_rt", parsed_rt)
+
+        lowtemp = extract_lowtemp_rate(parsed_rt)
+        trace(tc, "lowtemp_rate", lowtemp)
+        if lowtemp is not None:
+            parsed_rt["rate"] = lowtemp
+            auto_isf_consoleLog.append(f"Parsed low-temp rate from RT: {lowtemp:.3f} U/h")
+
+        rt_disable_basal = False
+        raw_text = parsed_rt.get("_raw_text", "")
+
+        if any(
+            x in raw_text
+            for x in [
+                "disable smb",
+                "disabling smb",
+                "zero temp",
+                "low temp",
+                "microbolus",
+                "min guard",
+                "projected below",
+            ]
+        ):
+            rt_disable_basal = True
+            auto_isf_consoleLog.append("RT indicates SMB disabled / zero-temp → forcing basal=0 later")
+
+        trace(tc, "rt_disable_basal", rt_disable_basal)
+
+        # duration (compute early so diagnostics can use it)
+        duration = 30
+        try:
+            if rt_obj and isinstance(rt_obj, dict):
+                rt_dur = rt_obj.get("duration") or rt_obj.get("dur")
+                if rt_dur is not None:
+                    rd = int(float(rt_dur))
+                    if rd > 300:
+                        rd = max(5, rd // 60)
+                    duration = max(5, rd)
+                    auto_isf_consoleLog.append(f"Using duration from rt: {duration} minutes")
+                else:
+                    preds_rt = rt_obj.get("predBGs") or rt_obj.get("predictions")
+                    if preds_rt and isinstance(preds_rt, (list, tuple)):
+                        duration = max(duration, len(preds_rt) * 5)
+        except Exception:
+            logger.exception("autoisf_algorithm: suppressed exception in sensitivityRatio")
+
+        try:
+            if currenttemp is not None:
+                dur = int(getattr(currenttemp, "duration", 0) or 0)
+                if dur > 0:
+                    duration = max(duration, dur)
+        except Exception:
+            logger.exception("autoisf_algorithm: suppressed exception in duration fallback")
+
+        if loop_wanted_smb and loop_wanted_smb != "none":
+            duration = max(duration, 60)
+
+        trace(tc, "duration", duration)
+        # --- end RT pre-checks and duration ---
+
+        # ------------------ Диагностический блок predBG / IOB / eventual → insulinReq → rate ------------------
+        # Этот блок теперь выполняется после parsed_rt и duration, и помечает все ключи префиксом diagnostic.
+        now_ts_ms = None
+        try:
+            if isinstance(rt_obj, dict) and rt_obj.get("timestamp"):
+                now_ts_ms = int(rt_obj.get("timestamp"))
+            else:
+                now_ts_ms = int(time.time() * 1000)
+        except Exception:
+            now_ts_ms = int(time.time() * 1000)
+
+        # IOB OpenAPS (диагностика)
+        try:
+            simple_events = []
+            for e in iob_data_array or []:
+                ts = getattr(e, "timestamp", None) or getattr(e, "date", None) or now_ts_ms
+                amt = getattr(e, "amount", 0.0)
+                dur_e = getattr(e, "duration", 0)
+                rate_e = getattr(e, "rate", 0.0)
+                typ = getattr(e, "type", "bolus")
+                simple_events.append(InsulinEventSimple(ts, amt, dur_e, rate_e, typ))
+            iob_info = compute_iob_openaps(simple_events, now_ts_ms, dia_hours=4.0)
+            trace(tc, "diagnostic.iob_openaps", iob_info.get("iob"))
+            trace(tc, "diagnostic.activity_openaps", iob_info.get("activity"))
+        except Exception as _e:
+            trace(tc, "diagnostic.iob_openaps_error", str(_e))
+
+        # preds from RT or built from meal/profile
+        preds = {}
+        try:
+            preds = build_pred_from_rt_lists(rt_obj or {})
+            trace(tc, "diagnostic.preds_from_rt_lengths", {k: len(v) for k, v in preds.items()})
+        except Exception:
+            preds = {"pred_iob": [], "pred_cob": [], "pred_uam": [], "pred_zt": []}
+
+        # build COB if missing
+        ci_per_5m = 0.0
+        try:
+            if not preds.get("pred_cob"):
+                if meal_data and getattr(meal_data, "meal_cob", None):
+                    cob_model = simple_cob_absorption(
+                        meal_cob_g=getattr(meal_data, "meal_cob", 0.0), cat_hours=2.0, step_minutes=5
+                    )
+                    cr = getattr(profile, "carb_ratio", None)
+                    if cr and cr > 0:
+                        sens_mmol = getattr(profile, "sens", 4.8)
+                        sens_mgdl_per_U = sens_mmol * 18.0
+                        mgdl_per_gram = sens_mgdl_per_U / cr
+                        preds["pred_cob"] = [g * mgdl_per_gram for g in cob_model["pred_cob"]]
+                        ci_per_5m = cob_model["ci_per_5m"] * mgdl_per_gram
+                    else:
+                        preds["pred_cob"] = []
+                        ci_per_5m = 0.0
+                else:
+                    ci_per_5m = 0.0
+            else:
+                # оценка ci_per_5m из первого шага pred_cob (если RT дал абсолютные mg/dL)
+                try:
+                    ci_per_5m = preds.get("pred_cob", [0.0])[0] if preds.get("pred_cob") else 0.0
+                except Exception:
+                    ci_per_5m = 0.0
+            trace(tc, "diagnostic.ci_per_5m", ci_per_5m)
+        except Exception as _e:
+            trace(tc, "diagnostic.cob_build_error", str(_e))
+
+        # UAM pred
+        try:
+            if not preds.get("pred_uam"):
+                uam_impact = None
+                uam_duration = None
+                if isinstance(rt_obj, dict):
+                    uam_impact = rt_obj.get("uam_impact") or rt_obj.get("uamImpact") or rt_obj.get("uamimpact")
+                    uam_duration = rt_obj.get("uam_duration_hours") or rt_obj.get("uamDuration")
+                if uam_impact:
+                    preds["pred_uam"] = build_uam_pred(
+                        float(uam_impact), float(uam_duration) if uam_duration else 3.0, step_minutes=5
+                    )
+                else:
+                    preds["pred_uam"] = []
+            trace(tc, "diagnostic.pred_uam_len", len(preds.get("pred_uam", [])))
+        except Exception as _e:
+            trace(tc, "diagnostic.uam_build_error", str(_e))
+
+        # combine and eventual (diagnostic)
+        try:
+            combined = combine_pred_curves(preds)
+            eventual_mgdl_calc = combined.get("eventual_mgdl", 0.0)
+            eventual_mmol_calc = mgdl_to_mmol(eventual_mgdl_calc)
+            trace(tc, "diagnostic.eventual_mgdl_calc", eventual_mgdl_calc)
+            trace(tc, "diagnostic.eventual_mmol_calc", eventual_mmol_calc)
+        except Exception as _e:
+            eventual_mgdl_calc = None
+            eventual_mmol_calc = None
+            trace(tc, "diagnostic.combine_pred_error", str(_e))
+
+        # if eventualBG not provided by RT, use diagnostic eventual
+        try:
+            if eventualBG is None and eventual_mmol_calc is not None:
+                eventualBG = eventual_mmol_calc
+                trace(tc, "diagnostic.eventualBG_from_combined", eventualBG)
+        except Exception as e:
+            logger.debug("autoisf_algorithm: suppressed exception in diagnostic.eventualBG_from_combined: %s", e)
+            trace(tc, "diagnostic.eventualBG_from_combined_error", str(e))
+
+        # diagnostic insulinReq and rate
+        try:
+            effective_sens_diag = getattr(profile, "variable_sens", getattr(profile, "sens", 4.8))
+            if eventualBG is not None:
+                insulinReq_calc = insulin_required_from_eventual(
+                    eventualBG, getattr(profile, "target_bg", 6.4), effective_sens_diag
+                )
+            else:
+                insulinReq_calc = None
+            trace(tc, "diagnostic.insulinReq_calc", insulinReq_calc)
+
+            duration_for_rate = int(getattr(currenttemp, "duration", 30)) if currenttemp else 30
+            rate_calc = (
+                rate_from_insulinReq(insulinReq_calc or 0.0, duration_for_rate) if insulinReq_calc is not None else 0.0
+            )
+
+            # diagnostic limits: raw (no max_daily) and strict (respect max_daily)
+            limits_calc = apply_basal_limits(rate_calc, profile, respect_max_daily=False)
+            trace(tc, "diagnostic.rate_calc_raw", rate_calc)
+            trace(tc, "diagnostic.limits_calc", limits_calc)
+
+            limits_calc_strict = apply_basal_limits(rate_calc, profile, respect_max_daily=True)
+            trace(tc, "diagnostic.limits_calc_strict", limits_calc_strict)
+        except Exception as _e:
+            trace(tc, "diagnostic.insulin_rate_calc_error", str(_e))
+        # ------------------ конец диагностического блока ------------------
+
+        # autosens ratio
         autosens_ratio = 1.0
         if autosens_data is not None:
             try:
@@ -245,7 +435,7 @@ def determine_basal_autoisf(
             except Exception:
                 autosens_ratio = 1.0
 
-        # prefer sensitivityRatio from rt if present
+        # sensitivityRatio из rt
         try:
             sens_ratio_rt = None
             if rt_obj and isinstance(rt_obj, dict):
@@ -264,7 +454,7 @@ def determine_basal_autoisf(
 
         trace(tc, "autosens_ratio", autosens_ratio)
 
-        # effective sensitivity (rounded to reduce floating noise)
+        # чувствительность
         prof_sens = getattr(profile, "variable_sens", None) or getattr(profile, "sens", None)
         if prof_sens is None or prof_sens == 0:
             prof_sens = 6.0
@@ -276,78 +466,11 @@ def determine_basal_autoisf(
         trace(tc, "prof_sens", prof_sens)
         trace(tc, "effective_sens", effective_sens)
 
-        # duration: prefer rt.duration, else predBGs length*5, else currenttemp, else default
-        duration = 30
-        try:
-            if rt_obj and isinstance(rt_obj, dict):
-                rt_dur = rt_obj.get("duration") or rt_obj.get("dur")
-                if rt_dur is not None:
-                    rd = int(float(rt_dur))
-                    # if rt_dur looks like seconds convert to minutes
-                    if rd > 300:
-                        rd = max(5, rd // 60)
-                    duration = max(5, rd)
-                    auto_isf_consoleLog.append(f"Using duration from rt: {duration} minutes")
-                else:
-                    preds = rt_obj.get("predBGs") or rt_obj.get("predictions")
-                    if preds and isinstance(preds, (list, tuple)):
-                        duration = max(duration, len(preds) * 5)
-        except Exception:
-            logger.exception("autoisf_algorithm: suppressed exception in sensitivityRatio")
-
-        try:
-            if currenttemp is not None:
-                dur = int(getattr(currenttemp, "duration", 0) or 0)
-                if dur > 0:
-                    duration = max(duration, dur)
-        except Exception:
-            logger.exception("autoisf_algorithm: suppressed exception in duration fallback")
-
-        if loop_wanted_smb and loop_wanted_smb != "none":
-            duration = max(duration, 60)
-
-        trace(tc, "duration", duration)
-
-        # --- RT pre-checks (новый парсер) ---
-        parsed_rt = parse_rt_to_dict(rt_obj)
-        trace(tc, "parsed_rt", parsed_rt)
-
-        # Если нашли low-temp rate — используем его как RT rate
-        lowtemp = extract_lowtemp_rate(parsed_rt)
-        trace(tc, "lowtemp_rate", lowtemp)
-        if lowtemp is not None:
-            parsed_rt["rate"] = lowtemp
-            auto_isf_consoleLog.append(f"Parsed low-temp rate from RT: {lowtemp:.3f} U/h")
-
-        # Флаг отключения базала
-        rt_disable_basal = False
-        raw_text = parsed_rt.get("_raw_text", "")
-
-        # Признаки отключения SMB / zero-temp
-        if any(
-            x in raw_text
-            for x in [
-                "disable smb",
-                "disabling smb",
-                "zero temp",
-                "low temp",
-                "microbolus",
-                "min guard",
-                "projected below",
-            ]
-        ):
-            rt_disable_basal = True
-            auto_isf_consoleLog.append("RT indicates SMB disabled / zero-temp → forcing basal=0 later")
-
-        trace(tc, "rt_disable_basal", rt_disable_basal)
-        # --- end RT pre-checks ---
-
-        # insulin requirement (U) - compute after duration so rt.rate/ins can be used if present
+        # target
         target_bg = getattr(profile, "target_bg", None) or 6.4
         trace(tc, "target_bg", target_bg)
 
         insulinReq = None
-
         try:
             if eventualBG is not None:
                 insulinReq = (eventualBG - target_bg) / effective_sens
@@ -358,7 +481,7 @@ def determine_basal_autoisf(
 
         trace(tc, "insulinReq_raw", insulinReq)
 
-        # compute raw rate (U/h) with safeguards
+        # rate
         rate = 0.0
         try:
             rt_rate_provided_flag = None
@@ -428,7 +551,6 @@ def determine_basal_autoisf(
 
             rt_rate_provided_flag_check = None
             try:
-                # parsed_rt всегда dict, поэтому проверяем только его
                 rt_rate_provided_flag_check = parsed_rt.get("rate") or parsed_rt.get("deliveryRate")
             except Exception:
                 rt_rate_provided_flag_check = None
@@ -456,41 +578,35 @@ def determine_basal_autoisf(
 
             trace(tc, "final_rate_source", final_rate_source)
 
-            trace(tc, "final_rate_source", final_rate_source)
-
             auto_isf_consoleLog.append(
                 f"Final rate decision (pre-clamp): raw_rate={raw_rate:.3f} source={final_rate_source}"
             )
 
             try:
+                # округлим insulinReq для логов, если он мал
                 if insulinReq is not None and abs(insulinReq) < smb_threshold:
                     insulinReq = round(float(insulinReq), 3)
                 trace(tc, "insulinReq_rounded", insulinReq)
 
+                # округлим raw_rate для логов
                 raw_rate = round(float(raw_rate), 3)
                 trace(tc, "raw_rate_rounded", raw_rate)
 
-                if max_basal is not None:
-                    raw_rate = min(raw_rate, float(max_basal))
-                    trace(tc, "raw_rate_after_max_basal_final", raw_rate)
+                # применяем строгие лимиты для финального решения (учитываем max_daily_basal)
+                final_limits = apply_basal_limits(raw_rate, profile, respect_max_daily=True)
+                trace(tc, "final_limits_applied", final_limits)
 
-                try:
-                    if rt_rate_val is None:
-                        raw_rate = min(raw_rate, allowed_max)
-                        trace(tc, "raw_rate_after_allowed_max_final", raw_rate)
-                except Exception:
-                    logger.exception("autoisf_algorithm: suppressed exception in final_rate rounding")
-
-                final_rate = max(0.0, raw_rate)
-                rate = round(final_rate, 2)
+                # final_limits["final_rate"] уже округлён в apply_basal_limits
+                final_rate = float(final_limits.get("final_rate", 0.0))
+                rate = round(max(0.0, final_rate), 2)
                 trace(tc, "final_rate", rate)
 
-                auto_isf_consoleLog.append(
-                    f"Final rate after rounding/clamps: rate={rate:.2f} U/h (raw={raw_rate:.3f})"
-                )
+                auto_isf_consoleLog.append(f"Final rate after strict clamps: rate={rate:.2f} U/h (raw={raw_rate:.3f})")
             except Exception:
+                # fallback: если что-то пошло не так, используем безопасный raw_rate
                 rate = max(0.0, raw_rate)
                 trace(tc, "final_rate_exception_fallback", rate)
+
         except Exception:
             rate = 0.0
             trace(tc, "final_rate_exception_total", rate)
@@ -514,6 +630,14 @@ def determine_basal_autoisf(
         trace(tc, "result.insulinReq", res.insulinReq)
         trace(tc, "result.rate", res.rate)
         trace(tc, "result.duration", res.duration)
+
+        # mark final pred lists (if present) with final. prefix to avoid confusion with diagnostic.*
+        try:
+            trace(tc, "final.pred_uam_first10", preds.get("pred_uam", [])[:10])
+            trace(tc, "final.pred_zt_first10", preds.get("pred_zt", [])[:10])
+        except Exception as e:
+            logger.debug("autoisf_algorithm: suppressed exception while tracing final preds: %s", e)
+            trace(tc, "final.pred_trace_error", str(e))
 
         bg_str = f"{bg:.2f}" if (bg is not None) else "None"
         ev_str = f"{eventualBG:.2f}" if (eventualBG is not None) else "None"
