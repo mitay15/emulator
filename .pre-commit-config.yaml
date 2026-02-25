@@ -50,10 +50,13 @@ repos:
           - types-PyYAML
           - types-requests
         args:
+          - "aaps_emulator"
           - "--ignore-missing-imports"
           - "--allow-untyped-defs"
           - "--allow-untyped-calls"
           - "--follow-imports=silent"
+          - "--show-error-codes"
+        pass_filenames: false
         stages: [pre-push]
 
   - repo: https://github.com/PyCQA/bandit
