@@ -1,15 +1,10 @@
+from typing import Any
+
 from aaps_emulator.core.iob import InsulinEvent
 
 
-def build_iob_events(rt_dict):
-    """
-    Build insulin events from normalized RT.
-    Supports:
-      - bolus (units)
-      - temp basal (rate + duration)
-    """
-
-    events = []
+def build_iob_events(rt_dict: dict[str, Any]) -> list[InsulinEvent]:
+    events: list[InsulinEvent] = []
     if not isinstance(rt_dict, dict):
         return events
 

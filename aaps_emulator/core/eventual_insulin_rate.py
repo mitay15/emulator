@@ -1,5 +1,6 @@
 # aaps_emulator/core/eventual_insulin_rate.py
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ def rate_from_insulinReq(insulinReq_U: float | None, duration_min: int) -> float
         return 0.0
 
 
-def apply_basal_limits(rate_U_per_h: float, profile, respect_max_daily: bool = True) -> dict[str, float]:
+def apply_basal_limits(rate_U_per_h: float, profile: Any, respect_max_daily: bool = True) -> dict[str, float]:
     """
     Применяет ограничения к рассчитанной скорости (U/h).
 
@@ -84,15 +85,11 @@ def apply_basal_limits(rate_U_per_h: float, profile, respect_max_daily: bool = T
     """
     try:
         max_basal = getattr(profile, "max_basal", None)
-        if max_basal is None:
-            try:
-                max_basal = (
-                    float(profile.get("max_basal"))
-                    if isinstance(profile, dict) and profile.get("max_basal") is not None
-                    else 2.4
-                )
-            except Exception:
-                max_basal = 2.4
+        try:
+            max_basal_val = float(max_basal) if max_basal is not None else 0.0
+        except Exception:
+            max_basal_val = 0.0
+        raw_after_max = min(rate_U_per_h, max_basal_val)
         max_daily = getattr(profile, "max_daily_basal", None)
         if max_daily is None and isinstance(profile, dict):
             try:

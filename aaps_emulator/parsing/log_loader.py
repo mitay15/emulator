@@ -1,5 +1,6 @@
 import os
 import zipfile
+from typing import Any
 
 
 def find_all_zip_logs(logs_dir="logs"):
@@ -23,8 +24,9 @@ def extract_zip(zip_path, out_dir=None):
     return files
 
 
-def load_log_blocks(filepath):
-    with open(filepath, encoding="utf-8", errors="ignore") as f:
+def load_log_blocks(path: str) -> list[dict[str, Any]]:
+    ctx: list[dict[str, Any]] = []
+    with open(path, encoding="utf-8", errors="ignore") as f:
         lines = f.readlines()
 
     blocks = []
