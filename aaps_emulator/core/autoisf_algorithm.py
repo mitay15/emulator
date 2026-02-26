@@ -286,12 +286,17 @@ def determine_basal_autoisf(
         # --- end RT pre-checks and duration ---
 
         # ------------------ Диагностический блок predBG / IOB / eventual → insulinReq → rate ------------------
+        # determine now_ts_ms safely from rt timestamp if present
+        now_ts_ms = int(time.time() * 1000)
         try:
-            if isinstance(rt_obj, dict) and rt_obj.get("timestamp") is not None:
+            if isinstance(rt_obj, dict):
                 ts_raw = rt_obj.get("timestamp")
-                now_ts_ms = int(float(ts_raw))
-            else:
-                now_ts_ms = int(time.time() * 1000)
+                if ts_raw is not None:
+                    try:
+                        now_ts_ms = int(float(ts_raw))
+                    except (TypeError, ValueError):
+                        # keep fallback now_ts_ms
+                        now_ts_ms = int(time.time() * 1000)
         except Exception:
             now_ts_ms = int(time.time() * 1000)
 
