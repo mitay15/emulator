@@ -8,24 +8,27 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def _to_float_list(val: Any) -> list[float]:
+    """Преобразует список значений в список float, игнорируя мусор."""
+    if not isinstance(val, (list, tuple)):
+        return []
+
+    out: list[float] = []
+    for x in val:
+        try:
+            out.append(float(x))
+        except Exception as e:
+            logger.debug("cob_uam_pred: non-numeric value ignored: %s", e)
+            continue
+    return out
+
+
 def build_pred_from_rt_lists(rt: dict[str, Any]) -> dict[str, list[float]]:
     """
     Возвращает предсказания из RT (если есть) в mg/dL.
     Ключи: pred_iob, pred_cob, pred_uam, pred_zt.
     Все значения приводятся к спискам float.
     """
-
-    def _to_float_list(val: Any) -> list[float]:
-        if not isinstance(val, (list, tuple)):
-            return []
-        out: list[float] = []
-        for x in val:
-            try:
-                out.append(float(x))
-            except Exception as e:
-                logger.debug("cob_uam_pred: non-numeric value ignored: %s", e)
-                continue
-
     pred_iob = _to_float_list(rt.get("pred_iob") or rt.get("predIOB"))
     pred_cob = _to_float_list(rt.get("pred_cob") or rt.get("predCOB"))
     pred_uam = _to_float_list(rt.get("pred_uam") or rt.get("predUAM"))
@@ -39,7 +42,11 @@ def build_pred_from_rt_lists(rt: dict[str, Any]) -> dict[str, list[float]]:
     }
 
 
-def simple_cob_absorption(meal_cob_g: float, cat_hours: float = 2.0, step_minutes: int = 5) -> dict[str, Any]:
+def simple_cob_absorption(
+    meal_cob_g: float,
+    cat_hours: float = 2.0,
+    step_minutes: int = 5,
+) -> dict[str, Any]:
     """
     Простая модель распределения углеводов по CAT (равномерно).
     Возвращает:
@@ -69,7 +76,11 @@ def simple_cob_absorption(meal_cob_g: float, cat_hours: float = 2.0, step_minute
     }
 
 
-def build_uam_pred(uam_impact_mg_per_5m: float, uam_duration_hours: float, step_minutes: int = 5) -> list[float]:
+def build_uam_pred(
+    uam_impact_mg_per_5m: float,
+    uam_duration_hours: float,
+    step_minutes: int = 5,
+) -> list[float]:
     """
     Треугольная модель UAM (mg/dL per 5m).
     Возвращает список значений UAM по шагам.
@@ -83,8 +94,6 @@ def build_uam_pred(uam_impact_mg_per_5m: float, uam_duration_hours: float, step_
 
     peak = float(uam_impact_mg_per_5m)
     pred: list[float] = []
-
-    # Треугольная форма: максимум в середине
     mid = steps / 2.0
 
     for i in range(steps):

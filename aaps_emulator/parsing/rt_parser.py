@@ -72,7 +72,7 @@ def _maybe_convert_eventual(val: Any) -> Any:
         return val
 
 
-def normalize_rt(rt_raw: str | dict | None) -> dict:
+def normalize_rt(rt_raw: str | dict | None) -> dict[str, Any]:
     """
     Нормализует RT (строку или словарь) в словарь со snake_case ключами.
     Конвертирует eventualBG из mg/dL в mmol/L если значение > 30.
@@ -268,7 +268,7 @@ def normalize_rt(rt_raw: str | dict | None) -> dict:
     return {}
 
 
-def parse_rt_to_dict(rt: Any) -> dict:
+def parse_rt_to_dict(rt: Any) -> dict[str, Any]:
     """
     Возвращает нормализованный словарь RT, если rt — строка или dict.
     Иначе возвращает пустой dict.

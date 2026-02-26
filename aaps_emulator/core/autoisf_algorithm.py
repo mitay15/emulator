@@ -366,7 +366,7 @@ def determine_basal_autoisf(
                 try:
                     pred_cob_list = preds.get("pred_cob", [])
                     if pred_cob_list:
-                        ci_per_5m = float(pred_cob_list[0])
+                        ci_per_5m = float(pred_cob_list[0] or 0.0)
                     else:
                         ci_per_5m = 0.0
                 except Exception:
