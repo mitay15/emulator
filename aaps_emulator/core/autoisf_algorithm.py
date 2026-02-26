@@ -175,16 +175,16 @@ def determine_basal_autoisf(
 
     try:
         # bg и delta
+        bg_val = getattr(glucose_status, "glucose", None)
         try:
-            bg_val = getattr(glucose_status, "glucose", None)
             bg: float | None = float(bg_val) if bg_val is not None else None
-        except Exception:
+        except (TypeError, ValueError):
             bg = None
 
+        delta_raw = getattr(glucose_status, "delta", 0.0)
         try:
-            delta_raw = getattr(glucose_status, "delta", 0.0)
             delta: float = float(delta_raw or 0.0)
-        except Exception:
+        except (TypeError, ValueError):
             delta = 0.0
 
         trace(tc, "bg", bg)
