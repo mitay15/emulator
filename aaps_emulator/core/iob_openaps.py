@@ -39,10 +39,7 @@ def compute_iob_openaps(events: list[InsulinEventSimple], now_ts: int, dia_hours
             if elapsed < 0:
                 elapsed = 0.0
 
-            if elapsed >= dia_ms:
-                rem = 0.0
-            else:
-                rem = e.amount * (1.0 - (elapsed / dia_ms))
+            rem = 0.0 if elapsed >= dia_ms else e.amount * (1.0 - elapsed / dia_ms)
 
             activity = (e.amount / dia_hours) * max(0.0, 1.0 - (elapsed / dia_ms))
 

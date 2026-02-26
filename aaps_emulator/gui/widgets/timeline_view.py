@@ -51,24 +51,20 @@ class TimelineView(QtWidgets.QWidget):
             gs = inp.get("glucose_status")
             rt = inp.get("rt")
 
-            if filters.get("autoisf_on"):
-                if getattr(autosens, "ratio", 1.0) == 1.0:
-                    continue
-            if filters.get("smb"):
-                if not (rt.get("insulinReq") and rt.get("insulinReq") > 0):
-                    continue
-            if filters.get("high_delta"):
-                if not gs or abs(gs.delta) < 0.5:
-                    continue
+            if filters.get("autoisf_on") and getattr(autosens, "ratio", 1.0) == 1.0:
+                continue
+            if filters.get("smb") and not (rt.get("insulinReq") and rt.get("insulinReq") > 0):
+                continue
+            if filters.get("high_delta") and (not gs or abs(gs.delta) < 0.5):
+                continue
             tr = filters.get("time_range")
             if tr:
                 ts = r.get("ts_s", 0)
                 if ts < tr[0] or ts > tr[1]:
                     continue
             zipf = filters.get("zip_name")
-            if zipf:
-                if zipf.lower() not in r.get("zip_name", "").lower():
-                    continue
+            if zipf and zipf.lower() not in r.get("zip_name", "").lower():
+                continue
 
             visible.append(r["idx"])
 

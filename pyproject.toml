@@ -1,21 +1,40 @@
 [project]
 name = "aaps-emulator"
 version = "0.0.0"
-description = "AAPS Emulator"
+description = "AAPS Emulator — tools to parse logs, reproduce AutoISF logic, compare AAPS vs Python, and visualize results"
 authors = [
     { name = "Dimas" }
 ]
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+
+# Основные зависимости (runtime)
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "scipy",
+    "PyQt6",
+    "plotly"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "black",
+    "mypy",
+    "pre-commit"
+]
 
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-# ---------------------------------------------------------
-# semantic-release (единственный блок!)
-# ---------------------------------------------------------
+# -----------------------------
+# semantic-release (оставляем)
+# -----------------------------
 [tool.semantic_release]
 version_variable = "aaps_emulator/__init__.py:__version__"
 branch = "master"
@@ -28,9 +47,9 @@ commit_parser = "angular"
 username = "__token__"
 password = "env:PYPI_TOKEN"
 
-# ---------------------------------------------------------
+# -----------------------------
 # Ruff
-# ---------------------------------------------------------
+# -----------------------------
 [tool.ruff]
 line-length = 120
 target-version = "py311"
@@ -38,16 +57,16 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "C4"]
 
-# ---------------------------------------------------------
+# -----------------------------
 # Black
-# ---------------------------------------------------------
+# -----------------------------
 [tool.black]
 line-length = 120
 target-version = ["py311"]
 
-# ---------------------------------------------------------
+# -----------------------------
 # Mypy
-# ---------------------------------------------------------
+# -----------------------------
 [tool.mypy]
 python_version = "3.11"
 strict = true

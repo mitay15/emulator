@@ -207,10 +207,7 @@ def determine_basal_autoisf(
                 auto_isf_consoleLog.append(f"Converted BG from mg/dL to mmol/L: {bg:.3f}")
                 trace(tc, "bg_converted_mmol", bg)
             try:
-                if bg is not None:
-                    eventualBG = bg + (delta * 30.0)
-                else:
-                    eventualBG = None
+                eventualBG = bg + delta * 30.0 if bg is not None else None
             except Exception:
                 eventualBG = None
 
@@ -354,10 +351,7 @@ def determine_basal_autoisf(
             else:
                 try:
                     pred_cob_list = preds.get("pred_cob", [])
-                    if pred_cob_list:
-                        ci_per_5m = float(pred_cob_list[0] or 0.0)
-                    else:
-                        ci_per_5m = 0.0
+                    ci_per_5m = float(pred_cob_list[0] or 0.0) if pred_cob_list else 0.0
                 except Exception:
                     ci_per_5m = 0.0
             trace(tc, "diagnostic.ci_per_5m", ci_per_5m)
@@ -491,10 +485,7 @@ def determine_basal_autoisf(
 
         insulinReq: float | None = None
         try:
-            if eventualBG is not None:
-                insulinReq = (eventualBG - target_bg) / effective_sens
-            else:
-                insulinReq = None
+            insulinReq = (eventualBG - target_bg) / effective_sens if eventualBG is not None else None
         except Exception:
             insulinReq = None
 
@@ -545,10 +536,7 @@ def determine_basal_autoisf(
                 current_basal = float(getattr(profile, "current_basal", 0.0) or 0.0)
                 try:
                     profile_max_delta = getattr(profile, "max_delta_rate", None)
-                    if profile_max_delta is not None:
-                        max_delta_rate = float(profile_max_delta)
-                    else:
-                        max_delta_rate = 2.0
+                    max_delta_rate = float(profile_max_delta) if profile_max_delta is not None else 2.0
                 except Exception:
                     max_delta_rate = 2.0
                 allowed_max = current_basal + max_delta_rate

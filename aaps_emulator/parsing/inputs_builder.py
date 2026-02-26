@@ -36,9 +36,8 @@ def build_inputs(block):
         return None
 
     # variable_sens from RT
-    if prof and (not getattr(prof, "variable_sens", None)):
-        if rt.get("variable_sens") is not None:
-            prof.variable_sens = float(rt["variable_sens"])
+    if prof and (not getattr(prof, "variable_sens", None)) and rt.get("variable_sens") is not None:
+        prof.variable_sens = float(rt["variable_sens"])
 
     # target BG
     target_bg_rt = rt.get("target_bg")

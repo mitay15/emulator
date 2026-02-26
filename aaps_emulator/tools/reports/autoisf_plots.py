@@ -11,29 +11,28 @@ PLOTS_DIR = BASE / "tests" / "plots"
 
 
 def load_diffs():
+    def fget(row, name):
+        v = row.get(name)
+        if v is None or v == "":
+            return None
+        try:
+            return float(v)
+        except Exception:
+            return None
+
     rows = []
     with DIFFS_PATH.open(encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for r in reader:
-
-            def fget(name):
-                v = r.get(name)
-                if v is None or v == "":
-                    return None
-                try:
-                    return float(v)
-                except Exception:
-                    return None
-
             rows.append(
                 {
                     "idx": int(r["idx"]),
                     "ts": float(r["ts_s"]),
-                    "aaps_rate": fget("aaps_rate_ref"),
-                    "py_rate": fget("py_rate"),
-                    "aaps_eventual": fget("aaps_eventual_ref"),
-                    "py_eventual": fget("py_eventual"),
-                    "diff_eventual": fget("err_ev"),
+                    "aaps_rate": fget(r, "aaps_rate_ref"),
+                    "py_rate": fget(r, "py_rate"),
+                    "aaps_eventual": fget(r, "aaps_eventual_ref"),
+                    "py_eventual": fget(r, "py_eventual"),
+                    "diff_eventual": fget(r, "err_ev"),
                 }
             )
     return rows

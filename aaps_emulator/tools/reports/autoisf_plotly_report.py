@@ -11,40 +11,40 @@ logger = logging.getLogger(__name__)
 
 
 def load_diffs(path: Path):
+    def fget(row, name):
+        v = row.get(name)
+        if v is None or v == "":
+            return None
+        try:
+            return float(v)
+        except Exception:
+            return None
+
     rows = []
     with path.open(encoding="utf-8") as f:
         r = csv.DictReader(f)
         for row in r:
-
-            def fget(name):
-                v = row.get(name)
-                if v is None or v == "":
-                    return None
-                try:
-                    return float(v)
-                except Exception:
-                    return None
-
             try:
                 rows.append(
                     {
                         "idx": int(row["idx"]),
                         "ts": float(row["ts_s"]),
-                        "aaps_rate": fget("aaps_rate_ref"),
-                        "py_rate": fget("py_rate"),
-                        "aaps_eventual": fget("aaps_eventual_ref"),
-                        "py_eventual": fget("py_eventual"),
-                        "diff_eventual": fget("err_ev"),
-                        "bg": fget("bg"),
-                        "delta": fget("delta"),
-                        "autosens_ratio": fget("autosens_ratio"),
-                        "profile_sens": fget("profile_sens"),
-                        "profile_basal": fget("profile_basal"),
+                        "aaps_rate": fget(row, "aaps_rate_ref"),
+                        "py_rate": fget(row, "py_rate"),
+                        "aaps_eventual": fget(row, "aaps_eventual_ref"),
+                        "py_eventual": fget(row, "py_eventual"),
+                        "diff_eventual": fget(row, "err_ev"),
+                        "bg": fget(row, "bg"),
+                        "delta": fget(row, "delta"),
+                        "autosens_ratio": fget(row, "autosens_ratio"),
+                        "profile_sens": fget(row, "profile_sens"),
+                        "profile_basal": fget(row, "profile_basal"),
                     }
                 )
             except Exception:
                 logger.exception("load_diffs: skipping malformed row")
                 continue
+
     return rows
 
 
@@ -136,7 +136,7 @@ def main():
         y=py_rates,
         mode="markers",
         name="All points",
-        marker=dict(size=6, color="rgba(0, 0, 150, 0.4)"),
+        marker={"size": 6, "color": "rgba(0, 0, 150, 0.4)"},
         text=[f"idx={i}" for i in idxs],
         hovertemplate="AAPS: %{x}<br>Python: %{y}<br>%{text}",
     )
@@ -155,7 +155,7 @@ def main():
         y=worst_mask_y,
         mode="markers+text",
         name="Worst cases",
-        marker=dict(size=12, color="red", line=dict(width=2, color="black")),
+        marker={"size": 12, "color": "red", "line": {"width": 2, "color": "black"}},
         text=worst_text,
         textposition="top center",
         hovertemplate="AAPS: %{x}<br>Python: %{y}<br>%{text}",
@@ -167,7 +167,7 @@ def main():
         y=[0, max_val],
         mode="lines",
         name="Ideal",
-        line=dict(color="green", dash="dash"),
+        line={"color": "green", "dash": "dash"},
     )
 
     fig_scatter = go.Figure(data=[scatter_all, scatter_worst, diag])
@@ -195,14 +195,14 @@ def main():
 
     fig_ts.add_trace(go.Scatter(x=ts, y=a_rate, name="AAPS rate"), row=1, col=1)
     fig_ts.add_trace(
-        go.Scatter(x=ts, y=p_rate, name="Python rate", line=dict(dash="dash")),
+        go.Scatter(x=ts, y=p_rate, name="Python rate", line={"dash": "dash"}),
         row=1,
         col=1,
     )
 
     fig_ts.add_trace(go.Scatter(x=ts, y=a_ev, name="AAPS eventualBG"), row=2, col=1)
     fig_ts.add_trace(
-        go.Scatter(x=ts, y=p_ev, name="Python eventualBG", line=dict(dash="dash")),
+        go.Scatter(x=ts, y=p_ev, name="Python eventualBG", line={"dash": "dash"}),
         row=2,
         col=1,
     )
@@ -224,13 +224,13 @@ def main():
                 y=ar_vals_3d,
                 z=rate_vals_3d,
                 mode="markers",
-                marker=dict(size=3, color=rate_vals_3d, colorscale="Viridis"),
+                marker={"size": 3, "color": rate_vals_3d, "colorscale": "Viridis"},
             )
         ]
     )
     fig_3d.update_layout(
         title="3D: BG × autosens × rate",
-        scene=dict(xaxis_title="BG", yaxis_title="autosens_ratio", zaxis_title="rate"),
+        scene={"xaxis_title": "BG", "yaxis_title": "autosens_ratio", "zaxis_title": "rate"},
         height=700,
     )
 
@@ -251,7 +251,7 @@ def main():
             y=basal_vals_hm,
             z=diff_vals_hm,
             colorscale="RdBu",
-            colorbar=dict(title="diff eventualBG"),
+            colorbar={"title": "diff eventualBG"},
             nbinsx=20,
             nbinsy=20,
         )
@@ -275,7 +275,7 @@ def main():
                 colorscale="Viridis",
                 nbinsx=20,
                 nbinsy=20,
-                colorbar=dict(title="count"),
+                colorbar={"title": "count"},
             )
         )
         heat_fig.update_layout(
@@ -298,7 +298,7 @@ def main():
             y=rate_vals_bg,
             mode="markers",
             name="rate vs BG",
-            marker=dict(size=6, color="rgba(0, 150, 0, 0.5)"),
+            marker={"size": 6, "color": "rgba(0, 150, 0, 0.5)"},
         )
     )
     fig_bg_rate.update_layout(
@@ -318,7 +318,7 @@ def main():
             y=rate_vals_ar,
             mode="markers",
             name="rate vs autosens_ratio",
-            marker=dict(size=6, color="rgba(150, 0, 0, 0.5)"),
+            marker={"size": 6, "color": "rgba(150, 0, 0, 0.5)"},
         )
     )
     fig_ar_rate.update_layout(
@@ -333,7 +333,7 @@ def main():
 
     fig_sens = go.Figure()
     fig_sens.add_trace(
-        go.Scatter(x=sens_vals, y=rate_vals_sens, mode="markers", marker=dict(size=6, color="rgba(0, 120, 200, 0.5)"))
+        go.Scatter(x=sens_vals, y=rate_vals_sens, mode="markers", marker={"size": 6, "color": "rgba(0, 120, 200, 0.5)"})
     )
     fig_sens.update_layout(title="Rate vs Profile Sens", xaxis_title="sens", yaxis_title="rate")
 
@@ -343,7 +343,9 @@ def main():
 
     fig_basal = go.Figure()
     fig_basal.add_trace(
-        go.Scatter(x=basal_vals, y=rate_vals_basal, mode="markers", marker=dict(size=6, color="rgba(200, 120, 0, 0.5)"))
+        go.Scatter(
+            x=basal_vals, y=rate_vals_basal, mode="markers", marker={"size": 6, "color": "rgba(200, 120, 0, 0.5)"}
+        )
     )
     fig_basal.update_layout(title="Rate vs Profile Basal", xaxis_title="basal", yaxis_title="rate")
 

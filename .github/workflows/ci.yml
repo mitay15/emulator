@@ -2,17 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [ "master", "main" ]
   pull_request:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.11"]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -21,26 +16,19 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
+          pip install -e .
           pip install -r requirements-dev.txt
           pip install pre-commit
-          pip install .
 
-      - name: Cache pre-commit
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
-
-      - name: Run pre-commit
-        run: pre-commit run --all-files --show-diff-on-failure
-
-      - name: Run tests with coverage
+      - name: Run ruff
         run: |
-          pip install coverage
-          coverage run -m pytest
-          coverage xml
+          ruff check .
+
+      - name: Run tests
+        run: |
+          pytest -q

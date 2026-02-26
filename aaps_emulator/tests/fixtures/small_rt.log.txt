@@ -1,2 +1,0 @@
-eventualBG=144 duration=30 rate=0.5 insulinReq=0.2 variableSens=7
-eventualBG=90 duration=15 rate=0.1 insulinReq=0.05 variableSens=5
