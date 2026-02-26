@@ -34,6 +34,7 @@ from aaps_emulator.core.eventual_insulin_rate import (
 )
 from aaps_emulator.core.iob_openaps import InsulinEventSimple, compute_iob_openaps
 from aaps_emulator.core.rt_parser import extract_lowtemp_rate, parse_rt_to_dict
+from aaps_emulator.parsing.rt_parser import normalize_rt
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class TraceCollector:
             if hasattr(value, "__dict__"):
                 value = value.__dict__
         except Exception as e:
-            logger.debug(f"TraceCollector: suppressed exception: {e}")
+            logger.debug("TraceCollector: suppressed exception: %s", e)
         self.steps.append((name, value))
 
     def dump(self) -> list[tuple[str, Any]]:
@@ -71,47 +72,33 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> float | None:
     """
     Пытаемся вытащить eventualBG из rt (dict или строка).
     Возвращаем eventualBG в mmol/L или None.
-
-    Обрабатываем:
-      - dict с ключами 'eventualBG', 'eventual_bg', 'eventual'
-      - dict с 'predBGs' / 'predictions' / 'preds'
-      - строку с 'eventualBG=NNN' или 'eventual bg 14,2'
-
-    Если значение похоже на mg/dL (>30), делим на 18.
     """
     if not rt_obj:
         return None
 
-    # dict-like rt
     if isinstance(rt_obj, dict):
         ev = rt_obj.get("eventualBG") or rt_obj.get("eventual_bg") or rt_obj.get("eventual")
         if ev is not None:
             try:
                 evf = float(ev)
-                if evf > 30:
-                    return evf / 18.0
-                return evf
+                return evf / 18.0 if evf > 30 else evf
             except Exception:
                 logger.exception("autoisf_algorithm: suppressed exception")
 
         preds = rt_obj.get("predBGs") or rt_obj.get("predictions") or rt_obj.get("preds")
-        if preds and isinstance(preds, (list, tuple)) and len(preds) > 0:
+        if isinstance(preds, (list, tuple)) and preds:
             try:
                 last = float(preds[-1])
-                if last > 30:
-                    return last / 18.0
-                return last
+                return last / 18.0 if last > 30 else last
             except Exception:
                 logger.exception("autoisf_algorithm: suppressed exception in preds parsing")
 
         return None
 
-    # string-like rt
     try:
         s = str(rt_obj)
-        marker = "eventualBG="
-        if marker in s:
-            part = s.split(marker, 1)[1]
+        if "eventualBG=" in s:
+            part = s.split("eventualBG=", 1)[1]
             num = ""
             for ch in part:
                 if ch.isdigit() or ch in ".-,":
@@ -120,16 +107,12 @@ def _extract_predicted_eventual_from_rt(rt_obj: Any) -> float | None:
                     break
             if num:
                 val = float(num.replace(",", "."))
-                if val > 30:
-                    return val / 18.0
-                return val
+                return val / 18.0 if val > 30 else val
 
         m = re.search(r"eventual\s*bg\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)", s, flags=re.IGNORECASE)
         if m:
             val = float(m.group(1).replace(",", "."))
-            if val > 30:
-                return val / 18.0
-            return val
+            return val / 18.0 if val > 30 else val
     except Exception:
         logger.exception("autoisf_algorithm: suppressed exception in eventualBG projection")
 
@@ -164,8 +147,6 @@ def determine_basal_autoisf(
 
     # нормализуем rt в dict со snake_case и mmol
     try:
-        from aaps_emulator.parsing.rt_parser import normalize_rt
-
         if rt is not None:
             rt = normalize_rt(rt)
     except Exception as exc:
@@ -195,12 +176,14 @@ def determine_basal_autoisf(
     try:
         # bg и delta
         try:
-            bg: float | None = getattr(glucose_status, "glucose", None)
+            bg_val = getattr(glucose_status, "glucose", None)
+            bg: float | None = float(bg_val) if bg_val is not None else None
         except Exception:
             bg = None
+
         try:
             delta_raw = getattr(glucose_status, "delta", 0.0)
-            delta: float = float(delta_raw)
+            delta: float = float(delta_raw or 0.0)
         except Exception:
             delta = 0.0
 
@@ -303,7 +286,6 @@ def determine_basal_autoisf(
         # --- end RT pre-checks and duration ---
 
         # ------------------ Диагностический блок predBG / IOB / eventual → insulinReq → rate ------------------
-        # Этот блок теперь выполняется после parsed_rt и duration, и помечает все ключи префиксом diagnostic.
         try:
             if isinstance(rt_obj, dict) and rt_obj.get("timestamp") is not None:
                 ts_raw = rt_obj.get("timestamp")
@@ -334,7 +316,9 @@ def determine_basal_autoisf(
         try:
             preds = build_pred_from_rt_lists(rt_obj or {})
             trace(
-                tc, "diagnostic.preds_from_rt_lengths", {k: len(v) for k, v in preds.items() if hasattr(v, "__len__")}
+                tc,
+                "diagnostic.preds_from_rt_lengths",
+                {k: len(v) for k, v in preds.items() if hasattr(v, "__len__")},
             )
         except Exception:
             preds = {"pred_iob": [], "pred_cob": [], "pred_uam": [], "pred_zt": []}
@@ -428,7 +412,9 @@ def determine_basal_autoisf(
             effective_sens_diag = float(effective_sens_diag_raw or 4.8)
             if eventualBG is not None:
                 insulinReq_calc = insulin_required_from_eventual(
-                    eventualBG, float(getattr(profile, "target_bg", 6.4) or 6.4), effective_sens_diag
+                    eventualBG,
+                    float(getattr(profile, "target_bg", 6.4) or 6.4),
+                    effective_sens_diag,
                 )
             else:
                 insulinReq_calc = None
@@ -543,7 +529,10 @@ def determine_basal_autoisf(
 
             max_basal = getattr(profile, "max_basal", None)
             if max_basal is not None:
-                raw_rate = min(raw_rate, float(max_basal))
+                try:
+                    raw_rate = min(raw_rate, float(max_basal))
+                except Exception as e:
+                    logger.debug("autoisf_algorithm: failed to apply max_basal=%r: %s", max_basal, e)
 
             trace(tc, "raw_rate_after_max_basal", raw_rate)
 
