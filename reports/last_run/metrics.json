@@ -1,0 +1,14 @@
+{
+  "eventualBG_mae": 0.0,
+  "eventualBG_rmse": 0.0,
+  "eventualBG_max": 0.0,
+  "rate_mae": 0.3715625,
+  "rate_match_pct": 0.27631578947368424,
+  "autosens_mae": null,
+  "iob_mae": NaN,
+  "insulinReq_mae": 0.23688699377672423,
+  "smb_mae": null,
+  "temp_basal_match_pct": null,
+  "quality_score": null,
+  "count": 456
+}

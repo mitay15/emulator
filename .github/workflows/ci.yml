@@ -23,12 +23,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
           pip install -r requirements-dev.txt
+          pip install pytest-cov
           pip install pre-commit
 
       - name: Run ruff
         run: |
           ruff check .
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
-          pytest -q
+          pytest --cov=aaps_emulator --cov-report=term --cov-report=html
+
+      - name: Upload HTML coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: htmlcov/
+
+      - name: Run AAPS comparison (optional)
+        run: |
+          python -m aaps_emulator.tools.dump_diffs_and_inputs
+          python -m aaps_emulator.analysis.compare_runner
+          python -m aaps_emulator.analysis.metrics
+          python -m aaps_emulator.analysis.regression_guard

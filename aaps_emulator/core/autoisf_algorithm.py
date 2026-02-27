@@ -190,9 +190,108 @@ def determine_basal_autoisf(
         trace(tc, "bg", bg)
         trace(tc, "delta", delta)
 
+        # === DELTA CAP (AAPS 3.4) ===
+        # AAPS ограничивает влияние delta, чтобы не обнулять insulinReq при лёгком падении BG.
+        try:
+            d = float(delta)
+        except Exception:
+            d = 0.0
+
+        # AAPS: если delta > -0.5 → считаем её нулевой
+        capped_delta = 0.0 if d > -0.5 else d
+
+        auto_isf_consoleLog.append(f"Delta-cap: raw_delta={d:.3f} → capped_delta={capped_delta:.3f}")
+
+        delta = capped_delta
+        trace(tc, "delta_capped", delta)
+
+        # === LOW BG SAFETY (AAPS 3.4) ===
+        # Если текущий BG ниже min_bg — AAPS запрещает дополнительный инсулин.
+        min_bg_val = getattr(profile, "min_bg", None)
+        try:
+            min_bg = float(min_bg_val) if min_bg_val is not None else None
+        except (TypeError, ValueError):
+            min_bg = None
+
         # 1) eventualBG из rt
         eventualBG: float | None = None
         rt_obj: Any = rt
+
+        # === TEMP BASAL INTERACTION (AAPS 3.4) ===
+        # Если есть активный temp basal → AAPS НЕ включает safety и НЕ обнуляет insulinReq.
+        temp_rate = None
+        try:
+            temp_rate = float(getattr(currenttemp, "rate", 0.0))
+        except Exception:
+            temp_rate = None
+
+        temp_active = temp_rate is not None and temp_rate > 0
+
+        if temp_active:
+            auto_isf_consoleLog.append(f"Temp basal active ({temp_rate:.3f} U/h) → disabling low-BG and COB safety")
+            disable_safety = True
+        else:
+            disable_safety = False
+
+        trace(tc, "temp_active", temp_active)
+
+        if not disable_safety and bg is not None and min_bg is not None and bg < min_bg:
+            eventual_bg_low = _extract_predicted_eventual_from_rt(rt_obj)
+            if eventual_bg_low is None:
+                eventual_bg_low = bg
+            auto_isf_consoleLog.append(
+                f"Low BG safety: bg={bg:.3f} < min_bg={min_bg:.3f} → forcing insulinReq=0, rate=0"
+            )
+            res_low = AutoIsfResult(
+                eventualBG=eventual_bg_low,
+                insulinReq=0.0,
+                rate=0.0,
+                duration=30,
+            )
+            trace(tc, "low_bg_safety_result", res_low)
+            if trace_mode and tc is not None:
+                return res_low, tc.dump()
+            return res_low
+
+        # === MEAL / COB SAFETY (AAPS 3.4) ===
+        # Если есть активные углеводы и BG падает — AAPS запрещает дозирование.
+        meal_cob = getattr(meal_data, "meal_cob", 0) or 0
+        cob = None
+        if isinstance(rt_obj, dict):
+            cob = rt_obj.get("cob") or rt_obj.get("meal_cob")
+
+        if not disable_safety and (meal_cob > 0 or (cob is not None and cob > 0)) and delta is not None and delta < 0:
+            auto_isf_consoleLog.append(
+                f"Meal/COB safety: COB={meal_cob or cob}, delta={delta:.3f} → forcing insulinReq=0, rate=0"
+            )
+            res_meal = AutoIsfResult(
+                eventualBG=eventualBG,
+                insulinReq=0.0,
+                rate=0.0,
+                duration=30,
+            )
+            trace(tc, "meal_cob_safety_result", res_meal)
+            if trace_mode and tc is not None:
+                return res_meal, tc.dump()
+            return res_meal
+
+        # === NEGATIVE IOB SAFETY (AAPS 3.4) ===
+        # Если IOB < 0 — AAPS разрешает дозирование даже при низком BG.
+        iob_val = None
+        if isinstance(rt_obj, dict):
+            iob_val = rt_obj.get("iob")
+
+        try:
+            iob_val = float(iob_val)
+        except Exception:
+            iob_val = None
+
+        if iob_val is not None and iob_val < 0:
+            auto_isf_consoleLog.append(f"Negative IOB safety: iob={iob_val:.3f} → allow insulinReq even if BG < target")
+            # Ничего не возвращаем — просто пропускаем safety-гейты
+
+        # 1) eventualBG из rt
+        eventualBG = None
 
         if rt_obj:
             ev_from_rt = _extract_predicted_eventual_from_rt(rt_obj)
@@ -228,6 +327,23 @@ def determine_basal_autoisf(
         if lowtemp is not None:
             parsed_rt["rate"] = lowtemp
             auto_isf_consoleLog.append(f"Parsed low-temp rate from RT: {lowtemp:.3f} U/h")
+
+        # === NEGATIVE IOB SAFETY (AAPS 3.4) ===
+        # Если IOB < 0 → AAPS разрешает положительный basal даже при insulinReq == 0
+        neg_iob_safety = False
+        try:
+            iob_rt = parsed_rt.get("iob")
+            if iob_rt is None and isinstance(rt_obj, dict):
+                iob_rt = rt_obj.get("iob")
+            if iob_rt is not None and float(iob_rt) < 0:
+                neg_iob_safety = True
+                auto_isf_consoleLog.append(
+                    f"Negative IOB safety: IOB={iob_rt} < 0 → allow basal even when insulinReq==0"
+                )
+        except Exception:
+            neg_iob_safety = False
+
+        trace(tc, "neg_iob_safety", neg_iob_safety)
 
         rt_disable_basal = False
         raw_text = str(parsed_rt.get("_raw_text", ""))
@@ -269,7 +385,7 @@ def determine_basal_autoisf(
 
         try:
             if currenttemp is not None:
-                dur_val = getattr(currenttemp, "duration", 0) or 0
+                dur_val = getattr(currenttemp, "duration", 30) or 30
                 dur_int = int(dur_val)
                 if dur_int > 0:
                     duration = max(duration, dur_int)
@@ -292,7 +408,6 @@ def determine_basal_autoisf(
                     try:
                         now_ts_ms = int(float(ts_raw))
                     except (TypeError, ValueError):
-                        # keep fallback now_ts_ms
                         now_ts_ms = int(time.time() * 1000)
         except Exception:
             now_ts_ms = int(time.time() * 1000)
@@ -494,18 +609,29 @@ def determine_basal_autoisf(
         # rate
         rate: float = 0.0
         try:
-            rt_rate_provided_flag: Any = None
-            rt_rate_val: float | None = None
+            # === FIX 1: корректная проверка наличия ключей rate/deliveryRate ===
+            rt_rate_provided_flag = None
+
+            # 1) parsed_rt
+            if isinstance(parsed_rt, dict):
+                if "rate" in parsed_rt:
+                    rt_rate_provided_flag = parsed_rt["rate"]
+                elif "deliveryRate" in parsed_rt:
+                    rt_rate_provided_flag = parsed_rt["deliveryRate"]
+
+            # 2) сырой rt
+            if rt_rate_provided_flag is None and isinstance(rt_obj, dict):
+                if "rate" in rt_obj:
+                    rt_rate_provided_flag = rt_obj["rate"]
+                elif "deliveryRate" in rt_obj:
+                    rt_rate_provided_flag = rt_obj["deliveryRate"]
+
             try:
-                if isinstance(parsed_rt, dict):
-                    rt_rate_provided_flag = parsed_rt.get("rate") or parsed_rt.get("deliveryRate")
-                if rt_rate_provided_flag is None and rt_obj and isinstance(rt_obj, dict):
-                    rt_rate_provided_flag = rt_obj.get("rate") or rt_obj.get("deliveryRate")
-                if rt_rate_provided_flag is not None:
-                    rt_rate_val = float(rt_rate_provided_flag)
+                rt_rate_val = float(rt_rate_provided_flag) if rt_rate_provided_flag is not None else None
             except Exception:
-                rt_rate_provided_flag = None
                 rt_rate_val = None
+
+            trace(tc, "rt_rate_val", rt_rate_val)
 
             trace(tc, "rt_rate_val", rt_rate_val)
 
@@ -550,17 +676,27 @@ def determine_basal_autoisf(
                 insulinReq is not None
                 and abs(insulinReq) < smb_threshold
                 and bool(getattr(profile, "enableSMB_always", False))
+                and rt_rate_val is None
             ):
                 smb_ratio_local = getattr(profile, "smb_delivery_ratio", smb_ratio or 0.5)
                 raw_rate = raw_rate * float(smb_ratio_local)
                 trace(tc, "raw_rate_after_smb_scaling", raw_rate)
-            else:
+            elif rt_rate_val is not None:
                 auto_isf_consoleLog.append(
                     "RT rate present — delta cap and SMB scaling skipped to preserve RT decision"
                 )
 
             try:
-                rt_rate_provided_flag_check = parsed_rt.get("rate") or parsed_rt.get("deliveryRate")
+                # корректная проверка наличия флага rate в parsed_rt (даже если 0.0)
+                if isinstance(parsed_rt, dict):
+                    if "rate" in parsed_rt or "deliveryRate" in parsed_rt:
+                        rt_rate_provided_flag_check = (
+                            parsed_rt.get("rate") if "rate" in parsed_rt else parsed_rt.get("deliveryRate")
+                        )
+                    else:
+                        rt_rate_provided_flag_check = None
+                else:
+                    rt_rate_provided_flag_check = None
             except Exception:
                 rt_rate_provided_flag_check = None
 
@@ -571,25 +707,80 @@ def determine_basal_autoisf(
                 and insulinReq == 0.0
                 and not rt_disable_basal
                 and not rt_rate_provided_flag_check
+                and not neg_iob_safety
             ):
                 raw_rate = 0.0
-                auto_isf_consoleLog.append("insulinReq==0.0 and no RT rate provided — forcing raw_rate=0.0")
+                auto_isf_consoleLog.append(
+                    "insulinReq==0.0 and no RT rate provided — forcing raw_rate=0.0 (no negative IOB safety)"
+                )
                 trace(tc, "raw_rate_forced_zero_by_insulinReq", raw_rate)
 
+            # === FIX 2: final_rate_source должен учитывать наличие ключа, а не truthiness ===
             final_rate_source = "computed"
 
-            if (
-                isinstance(parsed_rt, dict) and (parsed_rt.get("rate") or parsed_rt.get("deliveryRate")) is not None
-            ) or (
-                rt_obj and isinstance(rt_obj, dict) and (rt_obj.get("rate") or rt_obj.get("deliveryRate")) is not None
-            ):
+            if isinstance(parsed_rt, dict) and ("rate" in parsed_rt or "deliveryRate" in parsed_rt):
                 final_rate_source = "rt_rate"
+
+            if isinstance(rt_obj, dict) and ("rate" in rt_obj or "deliveryRate" in rt_obj):
+                final_rate_source = "rt_rate"
+
+            trace(tc, "final_rate_source", final_rate_source)
 
             trace(tc, "final_rate_source", final_rate_source)
 
             auto_isf_consoleLog.append(
                 f"Final rate decision (pre-clamp): raw_rate={raw_rate:.3f} source={final_rate_source}"
             )
+
+            # === AAPS RT BASAL OVERRIDE (correct placement) ===
+            # === FIX 3: корректная проверка наличия ключей rate/duration ===
+            rt_rate = None
+            rt_dur = None
+
+            # 1) parsed_rt
+            if isinstance(parsed_rt, dict):
+                if "rate" in parsed_rt:
+                    rt_rate = parsed_rt["rate"]
+                elif "deliveryRate" in parsed_rt:
+                    rt_rate = parsed_rt["deliveryRate"]
+                rt_dur = parsed_rt.get("duration") or parsed_rt.get("dur")
+
+            # 2) сырой rt
+            if rt_rate is None and isinstance(rt_obj, dict):
+                if "rate" in rt_obj:
+                    rt_rate = rt_obj["rate"]
+                elif "deliveryRate" in rt_obj:
+                    rt_rate = rt_obj["deliveryRate"]
+                if rt_dur is None:
+                    rt_dur = rt_obj.get("duration") or rt_obj.get("dur")
+
+            # convert
+            try:
+                rt_rate = float(rt_rate) if rt_rate is not None else None
+            except Exception:
+                rt_rate = None
+
+            try:
+                rt_dur = int(float(rt_dur)) if rt_dur is not None else None
+            except Exception:
+                rt_dur = None
+
+            trace(tc, "rt_rate", rt_rate)
+            trace(tc, "rt_dur", rt_dur)
+
+            # AAPS override conditions
+            rt_override_allowed = (
+                rt_rate is not None
+                and rt_dur is not None
+                and rt_dur > 0
+                and not rt_disable_basal
+                and not neg_iob_safety  # AAPS still allows override even with neg IOB, but only if rate>0
+            )
+
+            if rt_override_allowed:
+                auto_isf_consoleLog.append(f"RT override: using temp basal {rt_rate:.3f} U/h for {rt_dur} min")
+                raw_rate = rt_rate
+                trace(tc, "rt_override_raw_rate", raw_rate)
 
             try:
                 # округлим insulinReq для логов, если он мал
@@ -601,6 +792,44 @@ def determine_basal_autoisf(
                 raw_rate = round(float(raw_rate), 3)
                 trace(tc, "raw_rate_rounded", raw_rate)
 
+                # === MAX DELTA RATE LIMIT (AAPS 3.4) ===
+                # Ограничиваем скорость изменения базала, чтобы не прыгать слишком резко.
+                try:
+                    current_basal_md = float(profile.current_basal)
+                except Exception:
+                    current_basal_md = 0.0
+
+                # Максимальное изменение за 5 минут (как в AAPS)
+                max_delta_per_5min = 0.3  # AAPS internal default
+
+                # duration в минутах
+                try:
+                    dur = float(duration)
+                except Exception:
+                    dur = 30.0
+
+                # сколько 5-минутных интервалов
+                intervals = max(1.0, dur / 5.0)
+
+                # максимальное изменение за duration
+                max_delta_rate_md = max_delta_per_5min * intervals
+
+                # ограничиваем raw_rate
+                delta_md = raw_rate - current_basal_md
+                if delta_md > max_delta_rate_md:
+                    raw_rate = current_basal_md + max_delta_rate_md
+                    auto_isf_consoleLog.append(
+                        f"max_delta_rate limit: reducing raw_rate to {raw_rate:.3f} (max_delta={max_delta_rate_md:.3f})"
+                    )
+                elif delta_md < -max_delta_rate_md:
+                    raw_rate = current_basal_md - max_delta_rate_md
+                    auto_isf_consoleLog.append(
+                        f"max_delta_rate limit: increasing raw_rate to {raw_rate:.3f} "
+                        f"(max_delta={max_delta_rate_md:.3f})"
+                    )
+
+                trace(tc, "raw_rate_after_max_delta", raw_rate)
+
                 # применяем строгие лимиты для финального решения (учитываем max_daily_basal)
                 final_limits = apply_basal_limits(raw_rate, profile, respect_max_daily=True)
                 trace(tc, "final_limits_applied", final_limits)
@@ -609,6 +838,28 @@ def determine_basal_autoisf(
                 final_rate = float(final_rate_val)
                 rate = round(max(0.0, final_rate), 2)
                 trace(tc, "final_rate", rate)
+
+                # === STRICT MAX DAILY BASAL LIMIT (AAPS 3.4) ===
+                try:
+                    max_daily = float(getattr(profile, "max_daily_basal", None) or 0.0)
+                except Exception:
+                    max_daily = 0.0
+
+                if max_daily > 0.0 and rate > max_daily:
+                    auto_isf_consoleLog.append(f"max_daily_basal limit: rate {rate:.2f} → {max_daily:.2f}")
+                    rate = max_daily
+                    trace(tc, "rate_after_max_daily_basal", rate)
+
+                # === SMB-ONLY MODE (AAPS 3.4) ===
+                # Если AAPS в SMB-only режиме — basal=0, insulinReq сохраняется.
+                smb_only = False
+                if isinstance(rt_obj, dict):
+                    smb_only = bool(rt_obj.get("smb_only") or rt_obj.get("smbOnly"))
+
+                if smb_only:
+                    auto_isf_consoleLog.append("SMB-only mode → forcing basal=0")
+                    rate = 0.0
+                    trace(tc, "smb_only_rate_zero", rate)
 
                 auto_isf_consoleLog.append(f"Final rate after strict clamps: rate={rate:.2f} U/h (raw={raw_rate:.3f})")
             except Exception:

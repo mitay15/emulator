@@ -12,7 +12,7 @@ from aaps_emulator.gui.widgets.details_view import DetailsView
 from aaps_emulator.gui.widgets.filters_bar import FiltersBar
 from aaps_emulator.gui.widgets.signals_view import SignalsView
 from aaps_emulator.gui.widgets.timeline_view import TimelineView
-from aaps_emulator.tools.autoisf_full_report import load_worst_rows
+from aaps_emulator.tools.reports.autoisf_full_report import load_worst_rows
 
 
 class MainWindow(QtWidgets.QMainWindow):
