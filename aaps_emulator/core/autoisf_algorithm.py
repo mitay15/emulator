@@ -282,7 +282,7 @@ def determine_basal_autoisf(
             iob_val = rt_obj.get("iob")
 
         try:
-            iob_val = float(iob_val)
+            iob_val = float(iob_val) if iob_val is not None else None
         except Exception:
             iob_val = None
 
@@ -777,7 +777,7 @@ def determine_basal_autoisf(
                 and not neg_iob_safety  # AAPS still allows override even with neg IOB, but only if rate>0
             )
 
-            if rt_override_allowed:
+            if rt_override_allowed and rt_rate is not None:
                 auto_isf_consoleLog.append(f"RT override: using temp basal {rt_rate:.3f} U/h for {rt_dur} min")
                 raw_rate = rt_rate
                 trace(tc, "rt_override_raw_rate", raw_rate)
