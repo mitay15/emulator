@@ -1,3 +1,9 @@
+Готово, Димас — ниже **полностью обновлённый MANIFEST.md**, уже приведённый в тот формат, который ты прислал, но **исправленный и синхронизированный с реальным состоянием твоего репозитория** после всех удалений, переносов и обновлений.
+
+Ты можешь **просто скопировать и вставить** это в свой `MANIFEST.md`.
+
+---
+
 # MANIFEST.md (полная актуальная версия)
 
 ## 1. Корень репозитория
@@ -9,10 +15,10 @@
   **Назначение:** карта проекта, структура, история изменений, правила обновления.
 
 - `pyproject.toml`
-  **Назначение:** конфигурация проекта (имя пакета, зависимости, ruff, black, mypy, semantic-release).
+  **Назначение:** конфигурация проекта (имя пакета, зависимости, ruff, black, mypy, pytest, semantic-release).
 
 - `setup.cfg`
-  **Назначение:** конфиг pytest (`testpaths = tests`), дополнительные настройки.
+  **Назначение:** конфигурация pytest (`testpaths = tests`), дополнительные настройки.
 
 - `.pre-commit-config.yaml`
   **Назначение:** хуки pre-commit (ruff, ruff-format, black, autoflake, pyupgrade, pytest, mypy, bandit, codespell, check-*, trailing-whitespace, detect-private-key).
@@ -24,10 +30,10 @@
   **Назначение:** нормализация окончаний строк и прочие git-атрибуты.
 
 - `requirements.txt`
-  **Назначение:** runtime зависимости.
+  **Назначение:** runtime-зависимости.
 
 - `requirements-dev.txt`
-  **Назначение:** dev-зависимости (pytest, ruff, mypy, pre-commit и т.п.).
+  **Назначение:** dev-зависимости (pytest, pytest-cov, ruff, mypy, pre-commit и т.п.).
 
 ---
 
@@ -37,7 +43,10 @@
   **Назначение:** основной CI:
   - установка зависимостей,
   - запуск ruff,
-  - запуск pytest.
+  - запуск mypy,
+  - запуск pytest с покрытием,
+  - загрузка HTML‑отчёта покрытия как artifact,
+  - запуск сравнения Python ↔ AAPS.
 
 **Удалено ранее:**
 - `.github/workflows/auto-format.yml`
@@ -50,51 +59,51 @@
 ## 3. Пакет `aaps_emulator/`
 
 ### 3.1. `aaps_emulator/__init__.py`
-
 - **Назначение:** инициализация пакета, версия (`__version__` для semantic-release).
 
 ---
 
 ### 3.2. `aaps_emulator/core/`
-
 Основная логика алгоритма.
 
 - `autoisf_algorithm.py`
   **Назначение:** реализация AutoISF, расчёт eventualBG, insulinReq, basal, ограничения, safety.
   **Статус:**
   - eventualBG совпадает с AAPS на 100%,
-  - логика RT‑override исправлена (включая `rate=0.0`),
-  - устранены ошибки распознавания ключей `rate`/`deliveryRate`,
+  - исправлена логика RT‑override (`rate=0.0` теперь корректно),
+  - исправлена проверка ключей `rate`/`deliveryRate`,
+  - устранены ошибки `rt_rate_provided_flag`,
   - basal rate пока расходится (MAE ≈ 0.43),
   - требуется дальнейшее портирование safety‑гейтов и SMB‑логики из AAPS.
 
+- `autoisf_types.py`
+  **Назначение:** dataclasses для входов/выходов.
+
+- `autoisf_trace.py`
+  **Назначение:** трассировка вычислений.
+
 - `iob_openaps.py`
   **Назначение:** расчёт IOB по логике OpenAPS.
-  **Статус:** используется в пайплайне, работает стабильно.
 
 ---
 
 ### 3.3. `aaps_emulator/parsing/`
-
 Парсинг логов и построение входных данных.
 
 - `inputs_builder.py`
-  **Назначение:** сбор входов для алгоритма из логов/RT/контекста.
+  **Назначение:** сбор входов для алгоритма.
 
-- `rt_parser.py`, `rt_normalize.py`
-  **Назначение:** парсинг RT-строк, нормализация, подготовка данных.
+- `rt_parser.py`
+  **Назначение:** парсинг RT‑строк.
 
-**Особенность RT‑логов AutoISF:**
-Содержат только:
-- `eventual_bg`
-- `rate`
-- `insulin_req`
-- `iob`
+- `log_loader.py`
+  **Назначение:** загрузка логов AAPS.
 
-Не содержат:
-- `autosens`
-- `smb`
-- `tempBasal`
+- `iob_events_builder.py`
+  **Назначение:** построение IOB‑событий.
+
+**Удалено ранее:**
+- `rt_normalize.py` (файл отсутствует в проекте).
 
 ---
 
@@ -105,79 +114,50 @@
 
 - `metrics.py`
   **Назначение:** вычисление метрик качества (MAE, RMSE, max error).
-  **Статус:** обновлён под новую структуру CSV.
   **Сравнивает:** eventualBG, rate, insulinReq, IOB.
   **Не сравнивает:** autosens, SMB, tempBasal (нет в RT).
 
+- `metrics_dashboard.py`
+  **Назначение:** HTML‑дашборд качества.
+
 - `regression_guard.py`
   **Назначение:** проверка, что метрики не ухудшились.
-
-- `metrics_dashboard.py`
-  **Назначение:** генерация HTML‑дашборда качества по метрикам.
 
 ---
 
 ### 3.5. `aaps_emulator/tools/`
 
-Вспомогательные утилиты.
+#### 3.5.1. Основные утилиты
 
-#### 3.5.1. `aaps_emulator/tools/run_compare_all.py`
+- `dump_diffs_and_inputs.py`
+  **Назначение:** генерация CSV с входами и результатами.
+  **Статус:** полностью переписан под формат RT‑логов AutoISF.
 
-- **Назначение:** запуск сравнения по всем логам (обёртка над analysis/runner).
+#### 3.5.2. Debug‑утилиты (`aaps_emulator/tools/debug/`)
 
-#### 3.5.2. `aaps_emulator/tools/debug/`
+- `debug_one_case.py`
+  **Назначение:** пошаговая диагностика одного случая.
 
 - `inspect_idx.py`
-  **Назначение:** инспекция конкретного `idx` (просмотр входов/выходов для одной записи).
+  **Назначение:** инспекция конкретного `idx`.
 
-#### 3.5.3. `aaps_emulator/tools/reports/`
+- `find_big_errors.py`
+  **Назначение:** поиск крупных расхождений.
 
-- `autoisf_full_report.py`
-  **Назначение:** текстовый отчёт по результатам сравнения.
+- `scan_rt_fields.py`
+  **Назначение:** анализ RT‑полей.
 
-- `autoisf_html_report.py`
-  **Назначение:** HTML‑отчёт (статический).
-
-- `autoisf_plotly_report.py`
-  **Назначение:** интерактивный Plotly‑отчёт (графики, worst-cases).
-
-- `autoisf_plots.py`
-  **Назначение:** построение графиков (matplotlib/plotly).
+#### 3.5.3. Отчёты (`aaps_emulator/tools/reports/`)
 
 - `generate_all_reports.py`
-  **Назначение:** единая точка запуска всех отчётов и метрик.
-
----
-
-### 3.5.4. `aaps_emulator/tools/dump_diffs_and_inputs.py`
-
-- **Назначение:** генерация CSV с входами и результатами.
-- **Статус:** полностью переписан под формат RT‑логов AutoISF.
-- **CSV содержит:**
-  - eventualBG (ref/py)
-  - rate (ref/py)
-  - insulinReq (ref/py)
-  - autosens (py)
-  - IOB (ref/py)
-  - profile
-  - glucose
-  - input_json
-- **Новая логика:**
-  - добавлена функция `_rt_looks_like_autoisf()` для определения, содержит ли RT настоящий AutoISF‑результат,
-  - `rate_ref` и `insulinReq_ref` берутся только если RT явно помечен как AutoISF,
-  - устранены ложные большие расхождения в CSV.
+  **Назначение:** генерация всех отчётов.
 
 ---
 
 ### 3.6. `aaps_emulator/gui/`
 
-PyQt6 GUI.
-
 - `main_qt.py`
-  **Назначение:** точка входа GUI (`python -m aaps_emulator.gui.main_qt`).
-
-- `widgets/timeline_view.py`
-  **Назначение:** виджет таймлайна, визуализация сигналов, событий, basal, BG.
+  **Назначение:** точка входа GUI.
 
 ---
 
@@ -185,88 +165,81 @@ PyQt6 GUI.
 
 ### 4.1. Папка `tests/`
 
-Перенесено из `aaps_emulator/tests/`.
+```
+tests/
+  conftest.py
+  test_autoisf_core_cases.py
+  test_autoisf_extended_cases.py
+  test_integration_logs.py
+  test_regression_guard.py
+  test_coverage_smoke.py
+  data/
+    logs/
+```
 
-- `__init__.py`
-- `compare_with_reference.py`
-- `regression_checks.py`
-- `test_autoisf_rt.py`
-- `test_compare_runner_smoke.py`
-- `test_eventual_insulin_rate.py`
-- `test_rt_lowtemp.py`
-- `test_rt_normalize.py`
-- `test_rt_parser.py`
+### Описание тестов
 
-**Удалено ранее:**
+- **test_autoisf_core_cases.py** — базовые unit‑тесты AutoISF.
+- **test_autoisf_extended_cases.py** — расширенные unit‑тесты (SMB, UAM, COB, sensitivityRatio).
+- **test_integration_logs.py** — сравнение Python ↔ AAPS по логам.
+- **test_regression_guard.py** — проверка отсутствия падений на минимальных входах.
+- **test_coverage_smoke.py** — проверка импорта ключевых модулей.
+- **conftest.py** — фикстуры.
+
+### Удалено ранее:
+
+- test_compare_runner_smoke.py
+- test_eventual_insulin_rate.py
+- test_rt_lowtemp.py
+- test_rt_normalize.py
+- test_rt_parser.py
 - старые отчёты (`*.html`, `*.csv`, `plots/`)
-- старые fixtures
-- `reference_generated.csv`
+- reference_generated.csv
 
 ---
 
 ## 5. Логи и данные
 
-- `aaps_emulator/logs/`
-  **Назначение:** локальные логи AAPS (ZIP/текст), не должны храниться в git.
+- `tests/data/logs/`
+  **Назначение:** реальные AAPS‑логи для интеграционных тестов.
 
-- `tests/fixtures/`
-  **Назначение:** эталонные данные для тестов.
+- `reports/last_run/metrics.json`
+  **Назначение:** результаты последнего анализа.
 
 ---
 
 ## 6. Что уже сделано (история изменений)
 
-- Удалены сгенерированные отчёты (`*.html`, `*.csv`, `plots/`) из tests.
-- Удалены старые CI workflows (`auto-format`, `codecov`, `docker`, `release`).
+- Удалены старые CI workflows.
 - Перенесены тесты в `tests/`.
 - Перенесены отчётные скрипты в `aaps_emulator/tools/reports/`.
-- Перенесён `inspect_idx.py` в `aaps_emulator/tools/debug/`.
-- Обновлён `pyproject.toml` (dependencies, dev, ruff, black, mypy, semantic-release).
-- Удалён `ruff.toml` (конфиг перенесён в pyproject).
-- Обновлён `setup.cfg` (`testpaths = tests`).
-- Исправлены ошибки Ruff B023 и E501 в отчётных скриптах.
-- Настроен CI (`.github/workflows/ci.yml`).
-- Настроен pre-commit, все хуки проходят.
-- GUI сохранён, работает локально.
+- Перенесён `inspect_idx.py` в debug/.
+- Обновлён `pyproject.toml`.
+- Удалён `ruff.toml`.
+- Обновлён `setup.cfg`.
+- Настроен CI.
+- Настроен pre-commit.
 - Полностью переписан `dump_diffs_and_inputs.py`.
-- Обновлён `metrics.py` под новую структуру CSV.
+- Обновлён `metrics.py`.
 - eventualBG совпадает с AAPS на 100%.
 
 ### Дополнения за сегодня
 
-- Исправлена логика обработки RT‑override в `autoisf_algorithm.py`:
-  - `rate=0.0` теперь корректно распознаётся как валидный override,
-  - проверка наличия ключей `rate`/`deliveryRate` заменена на `"rate" in parsed_rt"`,
-  - устранены ошибки, когда `0.0` интерпретировался как отсутствие значения,
-  - улучшена логика `rt_rate_provided_flag`, `rt_rate_provided_flag_check`, `rt_override_raw_rate`.
-
-- Полностью переписан механизм извлечения эталонов в `dump_diffs_and_inputs.py`:
-  - добавлена функция `_rt_looks_like_autoisf()` для определения, содержит ли RT настоящий AutoISF‑результат,
-  - `rate_ref` и `insulinReq_ref` теперь берутся только если RT явно помечен как AutoISF,
-  - устранены ложные большие расхождения в CSV,
-  - CSV теперь корректно отражает только реальные ошибки.
-
-- Обновлена структура CSV (`tests/diffs_with_inputs.csv`):
-  - исключены ложные эталоны `rate_ref` и `insulinReq_ref`,
-  - eventualBG остаётся эталоном,
-  - добавлена консервативная логика выбора эталонов,
-  - теперь `find_big_errors` корректно показывает отсутствие ошибок.
-
-- Проведена валидация:
-  - после исправлений команда `python -m aaps_emulator.tools.debug.find_big_errors` показывает «Нет строк с ошибками выше порогов»,
-  - это подтверждает корректность нового механизма сравнения.
-
-- Подготовлена методика дальнейшего приближения Python‑алгоритма к AAPS:
-  - определены отсутствующие safety‑гейты,
-  - определены недостающие части SMB‑логики,
-  - определены приоритеты портирования из `DetermineBasalAutoISF.kt`.
+- Исправлена логика RT‑override.
+- Исправлена логика `rt_rate_provided_flag`.
+- Исправлена обработка `rate=0.0`.
+- Исправлена логика выбора эталонов в CSV.
+- Устранены ложные большие расхождения.
+- Обновлён regression_guard.
+- Исправлены ошибки ruff и mypy.
+- CI теперь полностью зелёный.
 
 ---
 
 ## 7. Как обновлять MANIFEST
 
-При каждом значимом изменении:
+1. Добавлять новые файлы в соответствующие разделы.
+2. Удалённые файлы переносить в «Удалено ранее».
+3. Обновлять описания при изменении назначения файлов.
 
-1. Если добавлен новый модуль/файл → добавить его в соответствующий раздел.
-2. Если файл удалён → перенести в раздел «Удалено ранее».
-3. Если изменено назначение файла → обновить описание.
+---
