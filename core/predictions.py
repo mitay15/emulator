@@ -1,13 +1,14 @@
 # aaps_emulator/core/predictions.py
 from __future__ import annotations
+
+import math
 from dataclasses import dataclass, field
 from typing import List, Optional
-import math
 
-from aaps_emulator.runner.build_inputs import AutoIsfInputs
-from aaps_emulator.core.utils import round_half_even
-from aaps_emulator.core.future_iob_engine import generate_future_iob, InsulinCurveParams
 from aaps_emulator.core.autoisf_structs import IobTotal
+from aaps_emulator.core.future_iob_engine import InsulinCurveParams, generate_future_iob
+from aaps_emulator.core.utils import round_half_even
+from aaps_emulator.runner.build_inputs import AutoIsfInputs
 
 
 def _round(value: float, digits: int = 0) -> float:
@@ -43,13 +44,14 @@ def calculate_expected_delta(target_bg: float, eventual_bg: float, bgi: float) -
     return _round(bgi + (target_delta / five_min_blocks), 1)
 
 
-def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{x:.0f}") -> PredictionsResult:
+def run_predictions(
+    inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{x:.0f}"
+) -> PredictionsResult:
     rt = inputs.rt or {}
     # dynIsfMode removed — AutoISF only
     currentTime = rt.get("timestamp", getattr(inputs.glucose_status, "date", 0))
 
     gs = inputs.glucose_status
-    currenttemp = inputs.current_temp
 
     # --- prepare iob_array and replace with Oref1 future ticks immediately ---
     iob_array = inputs.iob_data_array or []
@@ -59,12 +61,18 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
         iob_array = [IobTotal(iob=0.0, activity=0.0, lastBolusTime=0)]
 
     # Сохраняем исходный (реальный) тик — он содержит текущую activity и iob
-    orig_iob_tick = iob_array[0] if iob_array else IobTotal(iob=0.0, activity=0.0, lastBolusTime=0)
+    orig_iob_tick = (
+        iob_array[0] if iob_array else IobTotal(iob=0.0, activity=0.0, lastBolusTime=0)
+    )
 
     # Генерируем future Oref1‑кривую и заменяем iob_array
     try:
         # profile may not be defined yet; use fallback dia if needed
-        dia_hours = getattr(inputs.profile, "dia", 5.0) if getattr(inputs, "profile", None) is not None else 5.0
+        dia_hours = (
+            getattr(inputs.profile, "dia", 5.0)
+            if getattr(inputs, "profile", None) is not None
+            else 5.0
+        )
         params = InsulinCurveParams(dia_hours=float(dia_hours), step_minutes=5)
         iob_array = generate_future_iob(orig_iob_tick, params)
     except Exception:
@@ -73,7 +81,20 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
 
     profile = inputs.profile
     autosens_data = inputs.autosens or type("X", (), {"ratio": 1.0})()
-    meal_data = inputs.meal or type("M", (), {"carbs": 0.0, "mealCOB": 0.0, "lastCarbTime": 0, "slopeFromMaxDeviation": 0.0, "slopeFromMinDeviation": 0.0})()
+    meal_data = (
+        inputs.meal
+        or type(
+            "M",
+            (),
+            {
+                "carbs": 0.0,
+                "mealCOB": 0.0,
+                "lastCarbTime": 0,
+                "slopeFromMaxDeviation": 0.0,
+                "slopeFromMinDeviation": 0.0,
+            },
+        )()
+    )
 
     console_log: list[str] = []
     console_err: list[str] = []
@@ -83,18 +104,19 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
 
     bg_time = getattr(gs, "date", currentTime)
     system_time = currentTime
-    min_ago = _round((system_time - bg_time) / 60.0 / 1000.0, 1)
+    _round((system_time - bg_time) / 60.0 / 1000.0, 1)
     bg = getattr(gs, "glucose", 0.0)
-    noise = getattr(gs, "noise", 0.0) or 0.0
+    getattr(gs, "noise", 0.0) or 0.0
 
-    profile_current_basal = getattr(profile, "current_basal", 0.0)
-    basal = profile_current_basal
+    getattr(profile, "current_basal", 0.0)
 
-    max_iob = getattr(profile, "max_iob", 0.0)
+    getattr(profile, "max_iob", 0.0)
 
-    target_bg = (getattr(profile, "min_bg", 0.0) + getattr(profile, "max_bg", 0.0)) / 2.0
+    target_bg = (
+        getattr(profile, "min_bg", 0.0) + getattr(profile, "max_bg", 0.0)
+    ) / 2.0
     min_bg = getattr(profile, "min_bg", 0.0)
-    max_bg = getattr(profile, "max_bg", 0.0)
+    getattr(profile, "max_bg", 0.0)
 
     # --- Если RT содержит предсказания UAM, захватим их заранее (гарантирует точное совпадение с AAPS) ---
     rt_pred = (inputs.rt or {}).get("predBGs") or {}
@@ -107,10 +129,21 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
     # --- конец захвата RT.UAM ---
 
     # sensitivity ratio (temp target or autosens)
-    if ((getattr(profile, "high_temptarget_raises_sensitivity", False) and getattr(profile, "temptargetSet", False) and target_bg > 100)
-        or (getattr(profile, "low_temptarget_lowers_sensitivity", False) and getattr(profile, "temptargetSet", False) and target_bg < 100)):
+    if (
+        getattr(profile, "high_temptarget_raises_sensitivity", False)
+        and getattr(profile, "temptargetSet", False)
+        and target_bg > 100
+    ) or (
+        getattr(profile, "low_temptarget_lowers_sensitivity", False)
+        and getattr(profile, "temptargetSet", False)
+        and target_bg < 100
+    ):
         c = float(getattr(profile, "half_basal_exercise_target", 160.0) - 100)
-        sensitivityRatio = c / (c + target_bg - 100) if (c + target_bg - 100) != 0 else getattr(profile, "autosens_max", 1.2)
+        sensitivityRatio = (
+            c / (c + target_bg - 100)
+            if (c + target_bg - 100) != 0
+            else getattr(profile, "autosens_max", 1.2)
+        )
         sensitivityRatio = min(sensitivityRatio, getattr(profile, "autosens_max", 1.2))
         sensitivityRatio = _round(sensitivityRatio, 2)
         console_log.append(f"Sensitivity ratio set to {sensitivityRatio}; ")
@@ -139,7 +172,7 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
     sens = _round(sens, 1)
 
     # orig_iob_tick содержит реальный входной тик (с activity и iob)
-    orig_iob_iob = float(getattr(orig_iob_tick, "iob", 0.0) or 0.0)
+    float(getattr(orig_iob_tick, "iob", 0.0) or 0.0)
     orig_iob_activity = float(getattr(orig_iob_tick, "activity", 0.0) or 0.0)
 
     # Для BGI используем activity из исходного тика (orig_iob_tick), как делает AAPS.
@@ -155,25 +188,40 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
         elif iob_array:
             activity_for_bgi = float(getattr(iob_array[0], "activity", 0.0) or 0.0)
 
-    bgi = _round(- activity_for_bgi * sens * 5.0, 2)
+    bgi = _round(-activity_for_bgi * sens * 5.0, 2)
 
     # deviation calculation with sensitivityRatio scaling (AutoISF)
     horizon_min = 30.0 * float(sensitivityRatio or 1.0)
 
-    deviation = _round(horizon_min / 5.0 * (min(getattr(gs, "delta", 0.0),
-                                                getattr(gs, "shortAvgDelta", 0.0)) - bgi), 0)
+    deviation = _round(
+        horizon_min
+        / 5.0
+        * (min(getattr(gs, "delta", 0.0), getattr(gs, "shortAvgDelta", 0.0)) - bgi),
+        0,
+    )
     if deviation < 0:
-        deviation = _round(horizon_min / 5.0 * (min(getattr(gs, "shortAvgDelta", 0.0),
-                                                    getattr(gs, "longAvgDelta", 0.0)) - bgi), 0)
+        deviation = _round(
+            horizon_min
+            / 5.0
+            * (
+                min(getattr(gs, "shortAvgDelta", 0.0), getattr(gs, "longAvgDelta", 0.0))
+                - bgi
+            ),
+            0,
+        )
         if deviation < 0:
-            deviation = _round(horizon_min / 5.0 * (getattr(gs, "longAvgDelta", 0.0) - bgi), 0)
+            deviation = _round(
+                horizon_min / 5.0 * (getattr(gs, "longAvgDelta", 0.0) - bgi), 0
+            )
 
     # naive eventual BG
-    if (iob_array and getattr(iob_array[0], "iob", 0.0) > 0):
+    if iob_array and getattr(iob_array[0], "iob", 0.0) > 0:
         naive_eventualBG = _round(bg - (iob_array[0].iob * sens), 0)
     else:
         # AAPS: тоже использует sens, а не min(sens, profile.sens)
-        naive_eventualBG = _round(bg - ((iob_array[0].iob if iob_array else 0.0) * sens), 0)
+        naive_eventualBG = _round(
+            bg - ((iob_array[0].iob if iob_array else 0.0) * sens), 0
+        )
 
     eventualBG = naive_eventualBG + deviation
 
@@ -182,7 +230,9 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
     if getattr(profile, "lgsThreshold", None) is not None:
         lgsThreshold = getattr(profile, "lgsThreshold")
         if lgsThreshold > threshold:
-            console_err.append(f"Threshold set from {convert_bg(threshold)} to {convert_bg(float(lgsThreshold))}; ")
+            console_err.append(
+                f"Threshold set from {convert_bg(threshold)} to {convert_bg(float(lgsThreshold))}; "
+            )
             threshold = float(lgsThreshold)
 
     # initialize prediction arrays with current bg
@@ -194,12 +244,16 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
 
     enableUAM = getattr(profile, "enableUAM", False)
 
-    ci = _round(min(getattr(gs, "delta", 0.0), getattr(gs, "shortAvgDelta", 0.0)) - bgi, 1)
+    ci = _round(
+        min(getattr(gs, "delta", 0.0), getattr(gs, "shortAvgDelta", 0.0)) - bgi, 1
+    )
     uci = ci
 
     carb_ratio = getattr(profile, "carb_ratio", None) or 1.0
     csf = sens / carb_ratio if carb_ratio != 0 else sens
-    console_err.append(f"profile.sens: {getattr(profile, 'sens', None)}, sens: {sens}, CSF: {csf}")
+    console_err.append(
+        f"profile.sens: {getattr(profile, 'sens', None)}, sens: {sens}, CSF: {csf}"
+    )
 
     maxCarbAbsorptionRate = 30
     maxCI = _round(maxCarbAbsorptionRate * csf * 5 / 60, 1)
@@ -213,12 +267,21 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
     remainingCATime = remainingCATimeMin
 
     if getattr(meal_data, "carbs", 0.0) != 0.0:
-        remainingCATimeMin = max(remainingCATimeMin, getattr(meal_data, "mealCOB", 0.0) / assumedCarbAbsorptionRate)
-        lastCarbAge = _round((system_time - getattr(meal_data, "lastCarbTime", 0)) / 60000.0, 0)
-        fractionCOBAbsorbed = (getattr(meal_data, "carbs", 0.0) - getattr(meal_data, "mealCOB", 0.0)) / getattr(meal_data, "carbs", 1.0)
+        remainingCATimeMin = max(
+            remainingCATimeMin,
+            getattr(meal_data, "mealCOB", 0.0) / assumedCarbAbsorptionRate,
+        )
+        lastCarbAge = _round(
+            (system_time - getattr(meal_data, "lastCarbTime", 0)) / 60000.0, 0
+        )
+        fractionCOBAbsorbed = (
+            getattr(meal_data, "carbs", 0.0) - getattr(meal_data, "mealCOB", 0.0)
+        ) / getattr(meal_data, "carbs", 1.0)
         remainingCATime = remainingCATimeMin + 1.5 * lastCarbAge / 60.0
         remainingCATime = _round(remainingCATime, 1)
-        console_err.append(f"Last carbs {lastCarbAge} minutes ago; remainingCATime:{remainingCATime} hours;{_round(fractionCOBAbsorbed*100)}% carbs absorbed")
+        console_err.append(
+            f"Last carbs {lastCarbAge} minutes ago; remainingCATime:{remainingCATime} hours;{_round(fractionCOBAbsorbed*100)}% carbs absorbed"
+        )
 
     totalCI = max(0.0, ci / 5 * 60 * remainingCATime / 2)
     totalCA = totalCI / csf if csf != 0 else 0.0
@@ -238,9 +301,14 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
     if ci == 0.0:
         cid = 0.0
     else:
-        cid = min(remainingCATime * 60 / 5 / 2, max(0.0, getattr(meal_data, "mealCOB", 0.0) * csf / ci))
+        cid = min(
+            remainingCATime * 60 / 5 / 2,
+            max(0.0, getattr(meal_data, "mealCOB", 0.0) * csf / ci),
+        )
     acid = max(0.0, getattr(meal_data, "mealCOB", 0.0) * csf / aci)
-    console_err.append(f"Carb Impact: {ci} mg/dL per 5m; CI Duration: {_round(cid*5/60*2,1)} hours; remaining CI (~2h peak): {_round(remainingCIpeak,1)} mg/dL per 5m")
+    console_err.append(
+        f"Carb Impact: {ci} mg/dL per 5m; CI Duration: {_round(cid*5/60*2,1)} hours; remaining CI (~2h peak): {_round(remainingCIpeak,1)} mg/dL per 5m"
+    )
 
     # initialize minima/maxima with inf/-inf
     minIOBPredBG = float("inf")
@@ -257,11 +325,6 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
     maxIOBPredBG = bg
     maxCOBPredBG = bg
 
-    lastIOBpredBG = eventualBG
-    lastCOBpredBG: Optional[float] = None
-    lastUAMpredBG: Optional[float] = None
-
-    UAMduration = 0.0
     remainingCItotal = 0.0
     remainingCIs: List[int] = []
     predCIs: List[int] = []
@@ -276,7 +339,10 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
         except Exception:
             activity = 0.0
         try:
-            activity_zt = float(getattr(getattr(iobTick, "iobWithZeroTemp", iobTick), "activity", 0.0) or 0.0)
+            activity_zt = float(
+                getattr(getattr(iobTick, "iobWithZeroTemp", iobTick), "activity", 0.0)
+                or 0.0
+            )
         except Exception:
             activity_zt = 0.0
 
@@ -291,24 +357,40 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
         IOBpredBG = IOBpredBGs[-1] + IOBpredBGI + predDev
         ZTpredBG = ZTpredBGs[-1] + predZTBGI
 
-        predCI = max(0.0, max(0.0, ci) * (1 - len(COBpredBGs) / max(cid * 2, 1.0))) if cid > 0 else 0.0
-        predACI = max(0.0, max(0, aci) * (1 - len(COBpredBGs) / max(acid * 2, 1.0))) if acid > 0 else 0.0
+        predCI = (
+            max(0.0, max(0.0, ci) * (1 - len(COBpredBGs) / max(cid * 2, 1.0)))
+            if cid > 0
+            else 0.0
+        )
+        predACI = (
+            max(0.0, max(0, aci) * (1 - len(COBpredBGs) / max(acid * 2, 1.0)))
+            if acid > 0
+            else 0.0
+        )
 
-        intervals = min(float(len(COBpredBGs)), max(0.0, (remainingCATime * 12) - len(COBpredBGs)))
-        remainingCI = (intervals / (remainingCATime / 2 * 12) * remainingCIpeak) if remainingCATime > 0 else 0.0
+        intervals = min(
+            float(len(COBpredBGs)), max(0.0, (remainingCATime * 12) - len(COBpredBGs))
+        )
+        remainingCI = (
+            (intervals / (remainingCATime / 2 * 12) * remainingCIpeak)
+            if remainingCATime > 0
+            else 0.0
+        )
 
         remainingCItotal += predCI + remainingCI
         remainingCIs.append(_round(remainingCI))
         predCIs.append(_round(predCI))
 
-        COBpredBG_val = COBpredBGs[-1] + predBGI + min(0.0, predDev) + predCI + remainingCI
+        COBpredBG_val = (
+            COBpredBGs[-1] + predBGI + min(0.0, predDev) + predCI + remainingCI
+        )
         aCOBpredBG_val = aCOBpredBGs[-1] + predBGI + min(0.0, predDev) + predACI
 
         predUCIslope = max(0.0, uci + (len(UAMpredBGs) * slopeFromDeviations))
         predUCImax = max(0.0, uci * (1 - len(UAMpredBGs) / max(3.0 * 60 / 5, 1.0)))
         predUCI = min(predUCIslope, predUCImax)
         if predUCI > 0:
-            UAMduration = _round((len(UAMpredBGs) + 1) * 5 / 60.0, 1)
+            _round((len(UAMpredBGs) + 1) * 5 / 60.0, 1)
 
         UAMpredBG_val = UAMpredBGs[-1] + predUAMBGI + min(0.0, predDev) + predUCI
 
@@ -353,7 +435,11 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
         if IOBpredBG > maxIOBPredBG:
             maxIOBPredBG = IOBpredBG
 
-        if (cid != 0.0 or remainingCIpeak > 0) and len(COBpredBGs) > insulinPeak5m and COBpredBG_val < minCOBPredBG:
+        if (
+            (cid != 0.0 or remainingCIpeak > 0)
+            and len(COBpredBGs) > insulinPeak5m
+            and COBpredBG_val < minCOBPredBG
+        ):
             minCOBPredBG = _round(COBpredBG_val, 0)
         if (cid != 0.0 or remainingCIpeak > 0) and COBpredBG_val > maxIOBPredBG:
             maxCOBPredBG = COBpredBG_val
@@ -382,7 +468,7 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
         else:
             IOBpredBGs.pop()
     res.pred_iob = [int(x) for x in IOBpredBGs]
-    lastIOBpredBG = float(_round(IOBpredBGs[-1], 0))
+    float(_round(IOBpredBGs[-1], 0))
 
     ZTpredBGs = [_round(min(401.0, max(39.0, x)), 0) for x in ZTpredBGs]
     for i in range(len(ZTpredBGs) - 1, 6, -1):
@@ -408,7 +494,7 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
             else:
                 COBpredBGs.pop()
         res.pred_cob = [int(x) for x in COBpredBGs]
-        lastCOBpredBG = COBpredBGs[-1]
+        COBpredBGs[-1]
         eventualBG = max(eventualBG, _round(COBpredBGs[-1], 0))
 
     if ci > 0 or remainingCIpeak > 0:
@@ -420,7 +506,7 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
                 else:
                     UAMpredBGs.pop()
             res.pred_uam = [int(x) for x in UAMpredBGs]
-            lastUAMpredBG = UAMpredBGs[-1]
+            UAMpredBGs[-1]
             eventualBG = max(eventualBG, _round(UAMpredBGs[-1], 0))
     else:
         # Если RT предоставил UAM, но ci==0, всё равно выставим pred_uam, чтобы совпадать с AAPS
@@ -432,7 +518,7 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
                 else:
                     UAMpredBGs.pop()
             res.pred_uam = [int(x) for x in UAMpredBGs]
-            lastUAMpredBG = UAMpredBGs[-1]
+            UAMpredBGs[-1]
             eventualBG = max(eventualBG, _round(UAMpredBGs[-1], 0))
 
     res.eventual_bg = eventualBG
@@ -450,14 +536,20 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
     minUAMPredBG = max(39.0, minUAMPredBG)
     minPredBG = _round(minIOBPredBG, 0)
 
-    fSensBG = min(minPredBG, bg)
+    min(minPredBG, bg)
 
-    future_sens = 0.0  # dyn removed; keep placeholder
-
-    fractionCarbsLeft = getattr(meal_data, "mealCOB", 0.0) / getattr(meal_data, "carbs", 1.0) if getattr(meal_data, "carbs", 0.0) != 0 else 0.0
+    fractionCarbsLeft = (
+        getattr(meal_data, "mealCOB", 0.0) / getattr(meal_data, "carbs", 1.0)
+        if getattr(meal_data, "carbs", 0.0) != 0
+        else 0.0
+    )
 
     if minUAMPredBG != float("inf") and minCOBPredBG != float("inf"):
-        avgPredBG = _round((1 - fractionCarbsLeft) * (UAMpredBG_val or IOBpredBG) + fractionCarbsLeft * (COBpredBG_val or IOBpredBG), 0)
+        avgPredBG = _round(
+            (1 - fractionCarbsLeft) * (UAMpredBG_val or IOBpredBG)
+            + fractionCarbsLeft * (COBpredBG_val or IOBpredBG),
+            0,
+        )
     elif minCOBPredBG != float("inf"):
         avgPredBG = _round((IOBpredBG + (COBpredBG_val or IOBpredBG)) / 2.0, 0)
     elif minUAMPredBG != float("inf"):
@@ -468,9 +560,12 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
     if minZTGuardBG > avgPredBG:
         avgPredBG = minZTGuardBG
 
-    if (cid > 0.0 or remainingCIpeak > 0):
+    if cid > 0.0 or remainingCIpeak > 0:
         if enableUAM:
-            minGuardBG = fractionCarbsLeft * minCOBGuardBG + (1 - fractionCarbsLeft) * minUAMGuardBG
+            minGuardBG = (
+                fractionCarbsLeft * minCOBGuardBG
+                + (1 - fractionCarbsLeft) * minUAMGuardBG
+            )
         else:
             minGuardBG = minCOBGuardBG
     elif enableUAM:
@@ -486,7 +581,11 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
     if minZTGuardBG < threshold:
         minZTUAMPredBG = (minUAMPredBG + minZTGuardBG) / 2.0
     elif minZTGuardBG < target_bg:
-        blendPct = (minZTGuardBG - threshold) / (target_bg - threshold) if (target_bg - threshold) != 0 else 0.0
+        blendPct = (
+            (minZTGuardBG - threshold) / (target_bg - threshold)
+            if (target_bg - threshold) != 0
+            else 0.0
+        )
         blendedMinZTGuardBG = minUAMPredBG * blendPct + minZTGuardBG * (1 - blendPct)
         minZTUAMPredBG = (minUAMPredBG + blendedMinZTGuardBG) / 2.0
     elif minZTGuardBG > minUAMPredBG:
@@ -498,8 +597,13 @@ def run_predictions(inputs: AutoIsfInputs, profile_util_convert_bg=lambda x: f"{
         if not enableUAM and minCOBPredBG != float("inf"):
             minPredBG = _round(max(minIOBPredBG, minCOBPredBG), 0)
         elif minCOBPredBG != float("inf"):
-            blendedMinPredBG = fractionCarbsLeft * minCOBPredBG + (1 - fractionCarbsLeft) * minZTUAMPredBG
-            minPredBG = _round(max(minIOBPredBG, max(minCOBPredBG, blendedMinPredBG)), 0)
+            blendedMinPredBG = (
+                fractionCarbsLeft * minCOBPredBG
+                + (1 - fractionCarbsLeft) * minZTUAMPredBG
+            )
+            minPredBG = _round(
+                max(minIOBPredBG, max(minCOBPredBG, blendedMinPredBG)), 0
+            )
         elif enableUAM:
             minPredBG = minZTUAMPredBG
         else:

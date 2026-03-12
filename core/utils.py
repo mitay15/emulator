@@ -1,6 +1,7 @@
 # aaps_emulator/core/utils.py
-from decimal import Decimal, ROUND_HALF_EVEN, InvalidOperation
 import math
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
+
 
 def _to_number_safe(v):
     """Попытка привести строку/число к float; возвращает None если не получилось."""
@@ -22,6 +23,7 @@ def _to_number_safe(v):
                 return None
     return None
 
+
 def round_half_even(value: float, digits: int = 1) -> float:
     """
     BigDecimal HALF_EVEN compatible rounding used by Kotlin BigDecimal.
@@ -36,7 +38,9 @@ def round_half_even(value: float, digits: int = 1) -> float:
             return value
         if not math.isfinite(vnum):
             return value
-        q = Decimal(str(vnum)).quantize(Decimal(10) ** -digits, rounding=ROUND_HALF_EVEN)
+        q = Decimal(str(vnum)).quantize(
+            Decimal(10) ** -digits, rounding=ROUND_HALF_EVEN
+        )
         return float(q)
     except (InvalidOperation, TypeError):
         # последний шанс: попытаться вернуть float, если возможно

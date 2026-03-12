@@ -4,9 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from aaps_emulator.core.autoisf_structs import AutoIsfInputs
 from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
-
+from aaps_emulator.core.autoisf_structs import AutoIsfInputs
 
 CACHE_DIR = Path("data/cache")
 

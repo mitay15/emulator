@@ -1,6 +1,5 @@
 # aaps_emulator/visual/dashboard.py
 from __future__ import annotations
-from typing import Sequence
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -60,7 +59,9 @@ def build_dashboard(results: list[dict]) -> go.Figure:
 
     # Row 2: insulinReq
     fig.add_trace(
-        go.Scatter(x=times, y=insulin_req_py, name="insulinReq (Python)", mode="lines+markers"),
+        go.Scatter(
+            x=times, y=insulin_req_py, name="insulinReq (Python)", mode="lines+markers"
+        ),
         row=2,
         col=1,
     )

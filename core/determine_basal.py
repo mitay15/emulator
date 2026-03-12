@@ -1,24 +1,22 @@
 # aaps_emulator/core/determine_basal.py
 from __future__ import annotations
 
-from dataclasses import field
-from typing import Any, Dict, List, Optional
-import math
+from typing import Any, Dict, List
 
 from aaps_emulator.core.autoisf_structs import (
     AutoIsfInputs,
-    CorePredResultAlias,
-    GlucoseStatusAutoIsf,
-    TempBasal,
-    OapsProfileAutoIsf,
     AutosensResult,
-    MealData,
-    IobTotal,
-    safe_get,
+    CorePredResultAlias,
     DosingResult,
+    GlucoseStatusAutoIsf,
+    IobTotal,
+    MealData,
+    OapsProfileAutoIsf,
+    TempBasal,
+    safe_get,
 )
+from aaps_emulator.core.future_iob_engine import InsulinCurveParams, generate_future_iob
 from aaps_emulator.core.utils import round_half_even
-from aaps_emulator.core.future_iob_engine import generate_future_iob, InsulinCurveParams
 
 
 # helper rounding wrappers used in determine_basal
@@ -43,7 +41,9 @@ def get_max_safe_basal(profile: OapsProfileAutoIsf) -> float:
     max_daily_basal = getattr(profile, "max_daily_basal", profile.current_basal)
     max_basal = getattr(profile, "max_basal", profile.current_basal)
     max_daily_safety_multiplier = getattr(profile, "max_daily_safety_multiplier", 3.0)
-    current_basal_safety_multiplier = getattr(profile, "current_basal_safety_multiplier", 4.0)
+    current_basal_safety_multiplier = getattr(
+        profile, "current_basal_safety_multiplier", 4.0
+    )
     return min(
         max_basal,
         max_daily_basal * max_daily_safety_multiplier,
@@ -51,7 +51,13 @@ def get_max_safe_basal(profile: OapsProfileAutoIsf) -> float:
     )
 
 
-def set_temp_basal(rate: float, duration: int, profile: OapsProfileAutoIsf, res: DosingResult, currenttemp: TempBasal) -> DosingResult:
+def set_temp_basal(
+    rate: float,
+    duration: int,
+    profile: OapsProfileAutoIsf,
+    res: DosingResult,
+    currenttemp: TempBasal,
+) -> DosingResult:
     res.rate = float(rate)
     res.duration = int(duration)
     return res
@@ -85,7 +91,9 @@ def compute_deltas(glucose_history):
 
     for i in range(1, len(glucose_history)):
         then = glucose_history[i]
-        then_recalc = getattr(then, "recalculated", None) or getattr(then, "glucose", None)
+        then_recalc = getattr(then, "recalculated", None) or getattr(
+            then, "glucose", None
+        )
         then_ts = getattr(then, "timestamp", None) or getattr(then, "date", None)
         if then_recalc is None or then_ts is None:
             continue
@@ -162,7 +170,9 @@ def determine_basal_autoisf(
     _vs = getattr(profile, "variable_sens", None)
     _profile_sens = getattr(profile, "sens", 100.0)
     try:
-        sens = float(_vs) if (_vs is not None and float(_vs) > 0) else float(_profile_sens)
+        sens = (
+            float(_vs) if (_vs is not None and float(_vs) > 0) else float(_profile_sens)
+        )
     except Exception:
         try:
             sens = float(_profile_sens)
@@ -175,9 +185,9 @@ def determine_basal_autoisf(
     lgs_threshold = float(_lgs) if (_lgs is not None) else 72.0
 
     IOBpredBGs: List[float] = predictions.get("IOB", []) or []
-    COBpredBGs: List[float] = predictions.get("COB", []) or []
-    UAMpredBGs: List[float] = predictions.get("UAM", []) or []
-    ZTpredBGs: List[float] = predictions.get("ZT", []) or []
+    predictions.get("COB", []) or []
+    predictions.get("UAM", []) or []
+    predictions.get("ZT", []) or []
 
     naive_eventualBG = float(debug.get("naive_eventualBG", bg))
     eventualBG = float(debug.get("eventualBG", naive_eventualBG))
@@ -245,14 +255,15 @@ def determine_basal_autoisf(
     if not csf or csf == 0.0:
         csf = sens if sens and sens > 0 else 1.0
 
-    carbsReq = round_val(
-        ((bgUndershoot - zeroTempEffectDouble) / csf - COBforCarbsReq)
-    )
+    carbsReq = round_val(((bgUndershoot - zeroTempEffectDouble) / csf - COBforCarbsReq))
     carbsReq = max(0, int(carbsReq))
 
     carbsReq = max(0, carbsReq)
 
-    if carbsReq >= int(getattr(profile, "carbsReqThreshold", 1)) and minutesAboveThreshold <= 45:
+    if (
+        carbsReq >= int(getattr(profile, "carbsReqThreshold", 1))
+        and minutesAboveThreshold <= 45
+    ):
         res.carbsReq = int(carbsReq)
         res.carbsReqWithin = minutesAboveThreshold
 
@@ -268,7 +279,9 @@ def determine_basal_autoisf(
     # neutral temp if drop faster than expected
     if minDelta < expectedDelta:
         if not (microBolusAllowed and enableSMB):
-            if (currenttemp.duration or 0) > 15 and round_basal(basal) == round_basal(currenttemp.rate or 0.0):
+            if (currenttemp.duration or 0) > 15 and round_basal(basal) == round_basal(
+                currenttemp.rate or 0.0
+            ):
                 res.rate = currenttemp.rate or 0.0
                 res.duration = int(currenttemp.duration or 0)
                 return res
@@ -284,18 +297,26 @@ def determine_basal_autoisf(
                     res.rate = 0.0
                     res.duration = 60
                     return res
-            if (currenttemp.duration or 0) > 15 and round_basal(basal) == round_basal(currenttemp.rate or 0.0):
+            if (currenttemp.duration or 0) > 15 and round_basal(basal) == round_basal(
+                currenttemp.rate or 0.0
+            ):
                 res.rate = currenttemp.rate or 0.0
                 res.duration = int(currenttemp.duration or 0)
                 return res
 
             # If no insulin required and eventual BG is above target, apply zero temp
             try:
-                insulinReq_preview = round_val((min(minPredBG, eventualBG) - target_bg) / sens, 2) if sens != 0 else 0.0
+                insulinReq_preview = (
+                    round_val((min(minPredBG, eventualBG) - target_bg) / sens, 2)
+                    if sens != 0
+                    else 0.0
+                )
             except Exception:
                 insulinReq_preview = 0.0
 
-            if (insulinReq_preview is not None and insulinReq_preview <= 0.0) and (eventualBG is not None and eventualBG >= target_bg):
+            if (insulinReq_preview is not None and insulinReq_preview <= 0.0) and (
+                eventualBG is not None and eventualBG >= target_bg
+            ):
                 return set_temp_basal(0.0, 30, profile, res, currenttemp)
 
             res.rate = basal
@@ -303,7 +324,11 @@ def determine_basal_autoisf(
             return res
 
     # High-temp logic
-    insulinReq = round_val((min(minPredBG, eventualBG) - target_bg) / sens, 2) if sens != 0 else 0.0
+    insulinReq = (
+        round_val((min(minPredBG, eventualBG) - target_bg) / sens, 2)
+        if sens != 0
+        else 0.0
+    )
     max_iob = getattr(profile, "max_iob", 0.0)
     if insulinReq > max_iob - iob_data.iob:
         insulinReq = max_iob - iob_data.iob
@@ -314,7 +339,9 @@ def determine_basal_autoisf(
     if rate > maxSafeBasal:
         rate = maxSafeBasal
 
-    insulinScheduled = ((currenttemp.duration or 0) * ((currenttemp.rate or basal) - basal) / 60.0)
+    insulinScheduled = (
+        (currenttemp.duration or 0) * ((currenttemp.rate or basal) - basal) / 60.0
+    )
 
     if insulinScheduled >= insulinReq * 2:
         res.rate = rate
@@ -328,7 +355,9 @@ def determine_basal_autoisf(
         res.insulinReq = insulinReq
         return res
 
-    if (currenttemp.duration or 0) > 5 and round_basal(rate) <= round_basal(currenttemp.rate or 0.0):
+    if (currenttemp.duration or 0) > 5 and round_basal(rate) <= round_basal(
+        currenttemp.rate or 0.0
+    ):
         res.rate = currenttemp.rate or 0.0
         res.duration = int(currenttemp.duration or 0)
         return res
@@ -336,11 +365,20 @@ def determine_basal_autoisf(
     # SMB / microbolus logic
     iob_threshold_percent = getattr(profile, "iob_threshold_percent", 100)
     iobTHtolerance = 130.0
-    iobTHvirtual = (iob_threshold_percent * iobTHtolerance / 10000.0) * getattr(profile, "max_iob", 0.0)
+    iobTHvirtual = (iob_threshold_percent * iobTHtolerance / 10000.0) * getattr(
+        profile, "max_iob", 0.0
+    )
 
     if microBolusAllowed and enableSMB and bg > threshold:
-        mealInsulinReq = (round_val(getattr(meal, "mealCOB", 0.0) / (getattr(profile, "carb_ratio", 1.0) or 1.0), 3)
-                         if getattr(profile, "carb_ratio", None) else 0.0)
+        mealInsulinReq = (
+            round_val(
+                getattr(meal, "mealCOB", 0.0)
+                / (getattr(profile, "carb_ratio", 1.0) or 1.0),
+                3,
+            )
+            if getattr(profile, "carb_ratio", None)
+            else 0.0
+        )
 
         smb_max_range = getattr(profile, "smb_delivery_ratio", 0.5)
 
@@ -348,7 +386,11 @@ def determine_basal_autoisf(
             maxBolus = round_val(
                 smb_max_range
                 * profile.current_basal
-                * getattr(profile, "maxUAMSMBBasalMinutes", getattr(profile, "maxSMBBasalMinutes", 30))
+                * getattr(
+                    profile,
+                    "maxUAMSMBBasalMinutes",
+                    getattr(profile, "maxSMBBasalMinutes", 30),
+                )
                 / 60.0,
                 1,
             )
@@ -406,7 +448,9 @@ def determine_basal_autoisf(
     if (currenttemp.duration or 0) == 0:
         return set_temp_basal(rate, 30, profile, res, currenttemp)
 
-    if (currenttemp.duration or 0) > 5 and round_basal(rate) <= round_basal(currenttemp.rate or 0.0):
+    if (currenttemp.duration or 0) > 5 and round_basal(rate) <= round_basal(
+        currenttemp.rate or 0.0
+    ):
         res.rate = currenttemp.rate or 0.0
         res.duration = int(currenttemp.duration or 0)
         return res
@@ -415,7 +459,9 @@ def determine_basal_autoisf(
 
 
 # wrapper for pipeline
-def run_determine_basal(inputs: AutoIsfInputs, pred: CorePredResultAlias, variable_sens: float) -> DosingResult:
+def run_determine_basal(
+    inputs: AutoIsfInputs, pred: CorePredResultAlias, variable_sens: float
+) -> DosingResult:
     rt = inputs.rt or {}
     rt_pred = rt.get("predBGs") or {}
 
@@ -434,7 +480,10 @@ def run_determine_basal(inputs: AutoIsfInputs, pred: CorePredResultAlias, variab
     glucose_history = getattr(inputs, "glucose_history", None)
     if glucose_history is None:
         gs = inputs.glucose_status
-        class _G: pass
+
+        class _G:
+            pass
+
         now = _G()
         now.recalculated = getattr(gs, "recalculated", getattr(gs, "glucose", 0.0))
         now.timestamp = getattr(gs, "date", getattr(gs, "timestamp", 0))
@@ -454,7 +503,9 @@ def run_determine_basal(inputs: AutoIsfInputs, pred: CorePredResultAlias, variab
         "eventualBG": pred.eventual_bg,
         "minPredBG": pred.min_pred_bg,
         "minGuardBG": pred.min_guard_bg,
-        "avgPredBG": pred.min_pred_bg if pred.min_pred_bg is not None else pred.eventual_bg,
+        "avgPredBG": (
+            pred.min_pred_bg if pred.min_pred_bg is not None else pred.eventual_bg
+        ),
         "minIOBPredBG": pred.min_pred_bg,
         "delta": delta,
         "shortAvgDelta": shortAvgDelta,
@@ -477,9 +528,17 @@ def run_determine_basal(inputs: AutoIsfInputs, pred: CorePredResultAlias, variab
 
     # --- prepare iob_data for determine_basal: prefer generated Oref1 future ticks ---
     # take first provided tick (or zero fallback)
-    iob_source = inputs.iob_data_array[0] if inputs.iob_data_array else IobTotal(iob=0.0, activity=0.0, lastBolusTime=0)
+    iob_source = (
+        inputs.iob_data_array[0]
+        if inputs.iob_data_array
+        else IobTotal(iob=0.0, activity=0.0, lastBolusTime=0)
+    )
     try:
-        dia_hours = getattr(inputs.profile, "dia", 5.0) if getattr(inputs, "profile", None) is not None else 5.0
+        dia_hours = (
+            getattr(inputs.profile, "dia", 5.0)
+            if getattr(inputs, "profile", None) is not None
+            else 5.0
+        )
         params = InsulinCurveParams(dia_hours=float(dia_hours), step_minutes=5)
         future_iob = generate_future_iob(iob_source, params)
         # use first future tick at t=5min (index 1) for activity-based decisions if available
@@ -507,7 +566,11 @@ def run_determine_basal(inputs: AutoIsfInputs, pred: CorePredResultAlias, variab
 
     # Temporary test adjustment: if insulinReq == 0 and duration > 30, clamp duration to 30
     try:
-        if getattr(result, "insulinReq", 0.0) == 0.0 and getattr(result, "duration", 0) is not None and int(getattr(result, "duration", 0)) > 30:
+        if (
+            getattr(result, "insulinReq", 0.0) == 0.0
+            and getattr(result, "duration", 0) is not None
+            and int(getattr(result, "duration", 0)) > 30
+        ):
             result.duration = 30
     except Exception:
         pass

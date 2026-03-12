@@ -1,19 +1,20 @@
 # aaps_emulator/runner/build_inputs.py
 from __future__ import annotations
-from typing import Any, Dict, List
-from pathlib import Path
+
 import json
 import logging
 import traceback
+from pathlib import Path
+from typing import Any, Dict, List
 
 from aaps_emulator.core.autoisf_structs import (
     AutoIsfInputs,
-    GlucoseStatusAutoIsf,
-    TempBasal,
-    IobTotal,
-    OapsProfileAutoIsf,
     AutosensResult,
+    GlucoseStatusAutoIsf,
+    IobTotal,
     MealData,
+    OapsProfileAutoIsf,
+    TempBasal,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,7 +109,11 @@ def _to_iob(od: Dict[str, Any]) -> IobTotal:
             activity=_safe_float(od.get("activity")),
             lastBolusTime=_safe_int(od.get("lastBolusTime")),
             iobWithZeroTemp=iwt,
-            raw={k: v for k, v in od.items() if k not in {"iob", "activity", "lastBolusTime", "iobWithZeroTemp"}},
+            raw={
+                k: v
+                for k, v in od.items()
+                if k not in {"iob", "activity", "lastBolusTime", "iobWithZeroTemp"}
+            },
         )
     except Exception:
         logger.exception("Failed to convert IobTotal object")
@@ -123,7 +128,15 @@ def _to_profile(d: Dict[str, Any]) -> OapsProfileAutoIsf:
         # если OapsProfileAutoIsf принимает kwargs, можно предварительно привести ключевые поля
         d2 = dict(d)
         # приведение некоторых числовых полей
-        for k in ("min_bg", "max_bg", "sens", "variable_sens", "current_basal", "max_iob", "lgsThreshold"):
+        for k in (
+            "min_bg",
+            "max_bg",
+            "sens",
+            "variable_sens",
+            "current_basal",
+            "max_iob",
+            "lgsThreshold",
+        ):
             if k in d2:
                 if k == "lgsThreshold":
                     d2[k] = _safe_float(d2.get(k))  # может быть None
@@ -178,27 +191,59 @@ def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
     try:
         # Ищем объекты по типам в переданном block (не block_objs)
         gs_obj = next(
-            (o for o in block if isinstance(o, dict) and o.get("__type__") == "GlucoseStatusAutoIsf"),
+            (
+                o
+                for o in block
+                if isinstance(o, dict) and o.get("__type__") == "GlucoseStatusAutoIsf"
+            ),
             {},
         )
         ct_obj = next(
-            (o for o in block if isinstance(o, dict) and o.get("__type__") == "CurrentTemp"),
+            (
+                o
+                for o in block
+                if isinstance(o, dict) and o.get("__type__") == "CurrentTemp"
+            ),
             {},
         )
-        rt_obj = next((o for o in block if isinstance(o, dict) and o.get("__type__") == "RT"), {})
+        rt_obj = next(
+            (o for o in block if isinstance(o, dict) and o.get("__type__") == "RT"), {}
+        )
 
-        profile_obj = (rt_obj.get("profile") if isinstance(rt_obj, dict) else None) or next(
-            (o for o in block if isinstance(o, dict) and o.get("__type__") == "OapsProfileAutoIsf"),
+        profile_obj = (
+            rt_obj.get("profile") if isinstance(rt_obj, dict) else None
+        ) or next(
+            (
+                o
+                for o in block
+                if isinstance(o, dict) and o.get("__type__") == "OapsProfileAutoIsf"
+            ),
             {},
         )
-        autosens_obj = (rt_obj.get("autosens") if isinstance(rt_obj, dict) else None) or next(
-            (o for o in block if isinstance(o, dict) and o.get("__type__") == "AutosensResult"), {}
+        autosens_obj = (
+            rt_obj.get("autosens") if isinstance(rt_obj, dict) else None
+        ) or next(
+            (
+                o
+                for o in block
+                if isinstance(o, dict) and o.get("__type__") == "AutosensResult"
+            ),
+            {},
         )
-        meal_obj = (rt_obj.get("mealData") if isinstance(rt_obj, dict) else None) or next(
-            (o for o in block if isinstance(o, dict) and o.get("__type__") == "MealData"), {}
+        meal_obj = (
+            rt_obj.get("mealData") if isinstance(rt_obj, dict) else None
+        ) or next(
+            (
+                o
+                for o in block
+                if isinstance(o, dict) and o.get("__type__") == "MealData"
+            ),
+            {},
         )
 
-        iob_objs = [o for o in block if isinstance(o, dict) and o.get("__type__") == "IobTotal"]
+        iob_objs = [
+            o for o in block if isinstance(o, dict) and o.get("__type__") == "IobTotal"
+        ]
 
         # Конвертация в core-структуры (оборачиваем вызовы в try, чтобы локализовать ошибки)
         try:
@@ -237,7 +282,9 @@ def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
                     if vs_rt is not None:
                         autosens.ratio = vs_rt
                         setattr(autosens, "_variable_sens_from_rt", True)
-                        print("DEBUG: RT variable_sens propagated into autosens:", vs_rt)
+                        print(
+                            "DEBUG: RT variable_sens propagated into autosens:", vs_rt
+                        )
             except Exception as e:
                 print("DEBUG: propagate RT variable_sens into autosens failed:", e)
             # -----------------------------------------------------------

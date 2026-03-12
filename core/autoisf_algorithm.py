@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 
-from aaps_emulator.core.predictions import run_predictions
 from aaps_emulator.core.autoisf_structs import AutoIsfInputs
+from aaps_emulator.core.predictions import run_predictions
+
 
 @dataclass
 class RT:
@@ -10,6 +12,7 @@ class RT:
     duration: int
     insulinReq: float
     eventualBG_final: float
+
 
 def run_smb_tail(inputs: AutoIsfInputs):
     """
@@ -26,8 +29,14 @@ def run_smb_tail(inputs: AutoIsfInputs):
     if eventual is None:
         eventual = 0.0
 
-    sens = getattr(inputs.profile, "variable_sens", None) or getattr(inputs.profile, "sens", None) or 1.0
-    target = (getattr(inputs.profile, "min_bg", 0.0) + getattr(inputs.profile, "max_bg", 0.0)) / 2.0
+    sens = (
+        getattr(inputs.profile, "variable_sens", None)
+        or getattr(inputs.profile, "sens", None)
+        or 1.0
+    )
+    target = (
+        getattr(inputs.profile, "min_bg", 0.0) + getattr(inputs.profile, "max_bg", 0.0)
+    ) / 2.0
     basal = getattr(inputs.profile, "current_basal", 0.0)
 
     insulinReq = round((eventual - target) / sens, 2) if sens != 0 else 0.0
@@ -39,6 +48,7 @@ def run_smb_tail(inputs: AutoIsfInputs):
         insulinReq=insulinReq,
         eventualBG_final=eventual,
     )
+
 
 def autoisf_algorithm(*args, **kwargs):
     """

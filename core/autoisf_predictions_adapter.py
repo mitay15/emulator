@@ -4,6 +4,7 @@ from __future__ import annotations
 from .autoisf_structs import AutoIsfInputs, CorePredResultAlias
 from .predictions import run_predictions
 
+
 def compute_core_predictions(inputs: AutoIsfInputs) -> CorePredResultAlias:
     """
     Wrapper over run_predictions returning CorePredResultAlias for AutoISF module.

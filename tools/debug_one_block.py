@@ -20,17 +20,18 @@ Notes:
 """
 
 from __future__ import annotations
-import json
-import math
+
 import argparse
+import json
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
+from aaps_emulator.core.future_iob_engine import generate_future_iob
+from aaps_emulator.core.predictions import run_predictions
 
 # Import project modules (assumes script runs from project root)
 from aaps_emulator.runner.build_inputs import build_inputs_from_block
-from aaps_emulator.core.predictions import run_predictions
-from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
-from aaps_emulator.core.future_iob_engine import generate_future_iob
 
 # Tolerances
 TOL_EVENTUAL_BG = 0.5  # mg/dL
@@ -55,7 +56,9 @@ def num(v) -> Optional[float]:
         return None
 
 
-def compare_scalar(name: str, aaps_val: Any, py_val: Any, tol: float) -> Tuple[bool, float]:
+def compare_scalar(
+    name: str, aaps_val: Any, py_val: Any, tol: float
+) -> Tuple[bool, float]:
     """
     Return (mismatch_bool, abs_diff)
     If either is None -> treat as no mismatch (caller can decide).
@@ -68,7 +71,9 @@ def compare_scalar(name: str, aaps_val: Any, py_val: Any, tol: float) -> Tuple[b
     return diff > tol, diff
 
 
-def compare_arrays(aaps_arr: List[Any], py_arr: List[Any], tol: float) -> Dict[str, Any]:
+def compare_arrays(
+    aaps_arr: List[Any], py_arr: List[Any], tol: float
+) -> Dict[str, Any]:
     """
     Compare two numeric arrays element-wise. Returns summary dict.
     """
@@ -112,7 +117,9 @@ def load_mismatch(path: Path) -> Dict[str, Any]:
     return json.loads(txt)
 
 
-def reconstruct_inputs_from_dump(dump: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Any]:
+def reconstruct_inputs_from_dump(
+    dump: Dict[str, Any],
+) -> Tuple[List[Dict[str, Any]], Any]:
     """
     Prefer dump['inputs'] if present (already serialized). Otherwise use dump['block'].
     Returns (block_objs, inputs_hint)
@@ -155,10 +162,16 @@ def run_and_trace(block_objs: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     inputs = build_inputs_from_block(block_objs)
     # --- debug prints: show what pipeline actually receives ---
-    print("DEBUG: inputs.profile.variable_sens =", getattr(inputs.profile, "variable_sens", None))
-    print("DEBUG: inputs.profile._variable_sens_from_rt =", getattr(inputs.profile, "_variable_sens_from_rt", None))
+    print(
+        "DEBUG: inputs.profile.variable_sens =",
+        getattr(inputs.profile, "variable_sens", None),
+    )
+    print(
+        "DEBUG: inputs.profile._variable_sens_from_rt =",
+        getattr(inputs.profile, "_variable_sens_from_rt", None),
+    )
     print("DEBUG: inputs.autosens.ratio =", getattr(inputs.autosens, "ratio", None))
-# ---------------------------------------------------------
+    # ---------------------------------------------------------
 
     # run predictions
     pred = run_predictions(inputs)
@@ -193,8 +206,8 @@ def heuristic_suggestions(dump: Dict[str, Any], trace: Dict[str, Any]) -> List[s
     # Extract AAPS values
     aaps_eventual = safe_get(aaps_rt, "eventualBG", "eventual_bg", default=None)
     aaps_var_sens = safe_get(aaps_rt, "variable_sens", default=None)
-    aaps_min_pred = safe_get(aaps_rt, "minPredBG", "min_pred_bg", default=None)
-    aaps_min_guard = safe_get(aaps_rt, "minGuardBG", "min_guard_bg", default=None)
+    safe_get(aaps_rt, "minPredBG", "min_pred_bg", default=None)
+    safe_get(aaps_rt, "minGuardBG", "min_guard_bg", default=None)
     aaps_insulinReq = safe_get(aaps_rt, "insulinReq", "insulin_req", default=None)
     aaps_rate = safe_get(aaps_rt, "rate", default=None)
 
@@ -212,14 +225,19 @@ def heuristic_suggestions(dump: Dict[str, Any], trace: Dict[str, Any]) -> List[s
 
     # Compare eventualBG
     if aaps_eventual is not None and getattr(py_pred, "eventual_bg", None) is not None:
-        if abs(num(aaps_eventual) - num(getattr(py_pred, "eventual_bg", None))) > TOL_EVENTUAL_BG:
+        if (
+            abs(num(aaps_eventual) - num(getattr(py_pred, "eventual_bg", None)))
+            > TOL_EVENTUAL_BG
+        ):
             suggestions.append(
                 "eventualBG differs: check predictions.run_predictions internals: "
                 "sens selection, IOB activity curve (future_iob_engine), carb absorption (CI), and rounding."
             )
 
     # Compare pred_iob arrays
-    aaps_pred_iob = safe_get(aaps_rt, "pred_iob", "predIob", default=None) or safe_get(dump, "pred", {}).get("pred_iob")
+    aaps_pred_iob = safe_get(aaps_rt, "pred_iob", "predIob", default=None) or safe_get(
+        dump, "pred", {}
+    ).get("pred_iob")
     py_pred_iob = getattr(py_pred, "pred_iob", None)
     if aaps_pred_iob and py_pred_iob:
         arr_cmp = compare_arrays(aaps_pred_iob, py_pred_iob, tol=0.5)
@@ -230,7 +248,9 @@ def heuristic_suggestions(dump: Dict[str, Any], trace: Dict[str, Any]) -> List[s
             )
 
     # Compare pred_cob arrays
-    aaps_pred_cob = safe_get(aaps_rt, "pred_cob", "predCob", default=None) or safe_get(dump, "pred", {}).get("pred_cob")
+    aaps_pred_cob = safe_get(aaps_rt, "pred_cob", "predCob", default=None) or safe_get(
+        dump, "pred", {}
+    ).get("pred_cob")
     py_pred_cob = getattr(py_pred, "pred_cob", None)
     if aaps_pred_cob and py_pred_cob:
         arr_cmp = compare_arrays(aaps_pred_cob, py_pred_cob, tol=1.0)
@@ -241,7 +261,10 @@ def heuristic_suggestions(dump: Dict[str, Any], trace: Dict[str, Any]) -> List[s
 
     # Compare dosing differences
     if aaps_insulinReq is not None and py_dosing is not None:
-        if abs(num(aaps_insulinReq) - num(getattr(py_dosing, "insulinReq", None))) > TOL_INSULIN:
+        if (
+            abs(num(aaps_insulinReq) - num(getattr(py_dosing, "insulinReq", None)))
+            > TOL_INSULIN
+        ):
             suggestions.append(
                 "insulinReq differs: check determine_basal logic (minPredBG/minGuardBG handling, clamps, max_iob, safety multipliers)."
             )
@@ -275,7 +298,9 @@ def heuristic_suggestions(dump: Dict[str, Any], trace: Dict[str, Any]) -> List[s
 
     # If no suggestions, add generic guidance
     if not suggestions:
-        suggestions.append("No strong heuristic found. Inspect intermediate traces: sens, IOB activity, CI/CID, and determine_basal clamps.")
+        suggestions.append(
+            "No strong heuristic found. Inspect intermediate traces: sens, IOB activity, CI/CID, and determine_basal clamps."
+        )
 
     # Add file pointers for likely files to inspect
     file_hints = [
@@ -285,7 +310,9 @@ def heuristic_suggestions(dump: Dict[str, Any], trace: Dict[str, Any]) -> List[s
         ("determine_basal", "aaps_emulator/core/determine_basal.py"),
         ("utils", "aaps_emulator/core/utils.py"),
     ]
-    suggestions.append("Files to inspect: " + ", ".join(f"{n} ({p})" for n, p in file_hints))
+    suggestions.append(
+        "Files to inspect: " + ", ".join(f"{n} ({p})" for n, p in file_hints)
+    )
     return suggestions
 
 
@@ -295,7 +322,7 @@ def pretty_print_diff(dump: Dict[str, Any], trace: Dict[str, Any]) -> Dict[str, 
     """
     report: Dict[str, Any] = {}
     aaps_rt = dump.get("aaps_rt") or dump.get("aaps", {}) or {}
-    aaps_row = dump.get("row", {}) or {}
+    dump.get("row", {}) or {}
 
     py_vs = trace["pipeline"]["variable_sens"]
     py_pred = trace["pipeline"]["pred"]
@@ -309,68 +336,129 @@ def pretty_print_diff(dump: Dict[str, Any], trace: Dict[str, Any]) -> Dict[str, 
     aaps_vs = safe_get(aaps_rt, "variable_sens", "variableSens", default=None)
     mismatch_vs, diff_vs = compare_scalar("variable_sens", aaps_vs, py_vs, TOL_VAR_SENS)
     print(f"\nvariable_sens: AAPS={aaps_vs}  PY={py_vs}  diff={diff_vs}")
-    report["variable_sens"] = {"aaps": aaps_vs, "py": py_vs, "diff": diff_vs, "mismatch": mismatch_vs}
+    report["variable_sens"] = {
+        "aaps": aaps_vs,
+        "py": py_vs,
+        "diff": diff_vs,
+        "mismatch": mismatch_vs,
+    }
 
     # eventualBG
     aaps_eventual = safe_get(aaps_rt, "eventualBG", "eventual_bg", default=None)
     py_eventual = getattr(py_pred, "eventual_bg", None)
-    mismatch_ev, diff_ev = compare_scalar("eventualBG", aaps_eventual, py_eventual, TOL_EVENTUAL_BG)
+    mismatch_ev, diff_ev = compare_scalar(
+        "eventualBG", aaps_eventual, py_eventual, TOL_EVENTUAL_BG
+    )
     print(f"eventualBG: AAPS={aaps_eventual}  PY={py_eventual}  diff={diff_ev}")
-    report["eventualBG"] = {"aaps": aaps_eventual, "py": py_eventual, "diff": diff_ev, "mismatch": mismatch_ev}
+    report["eventualBG"] = {
+        "aaps": aaps_eventual,
+        "py": py_eventual,
+        "diff": diff_ev,
+        "mismatch": mismatch_ev,
+    }
 
     # minPredBG / minGuardBG
     aaps_min_pred = safe_get(aaps_rt, "minPredBG", "min_pred_bg", default=None)
     py_min_pred = getattr(py_pred, "min_pred_bg", None)
-    mismatch_mp, diff_mp = compare_scalar("minPredBG", aaps_min_pred, py_min_pred, TOL_EVENTUAL_BG)
+    mismatch_mp, diff_mp = compare_scalar(
+        "minPredBG", aaps_min_pred, py_min_pred, TOL_EVENTUAL_BG
+    )
     print(f"minPredBG: AAPS={aaps_min_pred}  PY={py_min_pred}  diff={diff_mp}")
-    report["minPredBG"] = {"aaps": aaps_min_pred, "py": py_min_pred, "diff": diff_mp, "mismatch": mismatch_mp}
+    report["minPredBG"] = {
+        "aaps": aaps_min_pred,
+        "py": py_min_pred,
+        "diff": diff_mp,
+        "mismatch": mismatch_mp,
+    }
 
     aaps_min_guard = safe_get(aaps_rt, "minGuardBG", "min_guard_bg", default=None)
     py_min_guard = getattr(py_pred, "min_guard_bg", None)
-    mismatch_mg, diff_mg = compare_scalar("minGuardBG", aaps_min_guard, py_min_guard, TOL_EVENTUAL_BG)
+    mismatch_mg, diff_mg = compare_scalar(
+        "minGuardBG", aaps_min_guard, py_min_guard, TOL_EVENTUAL_BG
+    )
     print(f"minGuardBG: AAPS={aaps_min_guard}  PY={py_min_guard}  diff={diff_mg}")
-    report["minGuardBG"] = {"aaps": aaps_min_guard, "py": py_min_guard, "diff": diff_mg, "mismatch": mismatch_mg}
+    report["minGuardBG"] = {
+        "aaps": aaps_min_guard,
+        "py": py_min_guard,
+        "diff": diff_mg,
+        "mismatch": mismatch_mg,
+    }
 
     # pred arrays
     def print_arr_cmp(name, aaps_arr, py_arr, tol):
         cmp = compare_arrays(aaps_arr or [], py_arr or [], tol)
-        print(f"\n{name}: len AAPS={cmp['len_aaps']} len PY={cmp['len_py']} mismatches={cmp['mismatches']} max_diff={cmp['max_abs_diff']} first_mismatch_index={cmp['first_mismatch_index']}")
+        print(
+            f"\n{name}: len AAPS={cmp['len_aaps']} len PY={cmp['len_py']} mismatches={cmp['mismatches']} max_diff={cmp['max_abs_diff']} first_mismatch_index={cmp['first_mismatch_index']}"
+        )
         return cmp
 
-    aaps_pred_iob = safe_get(aaps_rt, "pred_iob", "predIob", default=None) or safe_get(dump, "pred", {}).get("pred_iob")
+    aaps_pred_iob = safe_get(aaps_rt, "pred_iob", "predIob", default=None) or safe_get(
+        dump, "pred", {}
+    ).get("pred_iob")
     py_pred_iob = getattr(py_pred, "pred_iob", None)
-    report["pred_iob_cmp"] = print_arr_cmp("pred_iob", aaps_pred_iob, py_pred_iob, tol=0.5)
+    report["pred_iob_cmp"] = print_arr_cmp(
+        "pred_iob", aaps_pred_iob, py_pred_iob, tol=0.5
+    )
 
-    aaps_pred_cob = safe_get(aaps_rt, "pred_cob", "predCob", default=None) or safe_get(dump, "pred", {}).get("pred_cob")
+    aaps_pred_cob = safe_get(aaps_rt, "pred_cob", "predCob", default=None) or safe_get(
+        dump, "pred", {}
+    ).get("pred_cob")
     py_pred_cob = getattr(py_pred, "pred_cob", None)
-    report["pred_cob_cmp"] = print_arr_cmp("pred_cob", aaps_pred_cob, py_pred_cob, tol=1.0)
+    report["pred_cob_cmp"] = print_arr_cmp(
+        "pred_cob", aaps_pred_cob, py_pred_cob, tol=1.0
+    )
 
-    aaps_pred_uam = safe_get(aaps_rt, "pred_uam", "predUam", default=None) or safe_get(dump, "pred", {}).get("pred_uam")
+    aaps_pred_uam = safe_get(aaps_rt, "pred_uam", "predUam", default=None) or safe_get(
+        dump, "pred", {}
+    ).get("pred_uam")
     py_pred_uam = getattr(py_pred, "pred_uam", None)
-    report["pred_uam_cmp"] = print_arr_cmp("pred_uam", aaps_pred_uam, py_pred_uam, tol=1.0)
+    report["pred_uam_cmp"] = print_arr_cmp(
+        "pred_uam", aaps_pred_uam, py_pred_uam, tol=1.0
+    )
 
-    aaps_pred_zt = safe_get(aaps_rt, "pred_zt", "predZt", default=None) or safe_get(dump, "pred", {}).get("pred_zt")
+    aaps_pred_zt = safe_get(aaps_rt, "pred_zt", "predZt", default=None) or safe_get(
+        dump, "pred", {}
+    ).get("pred_zt")
     py_pred_zt = getattr(py_pred, "pred_zt", None)
     report["pred_zt_cmp"] = print_arr_cmp("pred_zt", aaps_pred_zt, py_pred_zt, tol=1.0)
 
     # dosing
     aaps_insulinReq = safe_get(aaps_rt, "insulinReq", "insulin_req", default=None)
     py_insulinReq = getattr(py_dosing, "insulinReq", None)
-    mismatch_ir, diff_ir = compare_scalar("insulinReq", aaps_insulinReq, py_insulinReq, TOL_INSULIN)
+    mismatch_ir, diff_ir = compare_scalar(
+        "insulinReq", aaps_insulinReq, py_insulinReq, TOL_INSULIN
+    )
     print(f"\ninsulinReq: AAPS={aaps_insulinReq}  PY={py_insulinReq}  diff={diff_ir}")
-    report["insulinReq"] = {"aaps": aaps_insulinReq, "py": py_insulinReq, "diff": diff_ir, "mismatch": mismatch_ir}
+    report["insulinReq"] = {
+        "aaps": aaps_insulinReq,
+        "py": py_insulinReq,
+        "diff": diff_ir,
+        "mismatch": mismatch_ir,
+    }
 
     aaps_rate = safe_get(aaps_rt, "rate", default=None)
     py_rate = getattr(py_dosing, "rate", None)
     mismatch_rate, diff_rate = compare_scalar("rate", aaps_rate, py_rate, TOL_RATE)
     print(f"rate: AAPS={aaps_rate}  PY={py_rate}  diff={diff_rate}")
-    report["rate"] = {"aaps": aaps_rate, "py": py_rate, "diff": diff_rate, "mismatch": mismatch_rate}
+    report["rate"] = {
+        "aaps": aaps_rate,
+        "py": py_rate,
+        "diff": diff_rate,
+        "mismatch": mismatch_rate,
+    }
 
     aaps_duration = safe_get(aaps_rt, "duration", default=None)
     py_duration = getattr(py_dosing, "duration", None)
-    mismatch_dur, diff_dur = compare_scalar("duration", aaps_duration, py_duration, tol=1.0)
+    mismatch_dur, diff_dur = compare_scalar(
+        "duration", aaps_duration, py_duration, tol=1.0
+    )
     print(f"duration: AAPS={aaps_duration}  PY={py_duration}  diff={diff_dur}")
-    report["duration"] = {"aaps": aaps_duration, "py": py_duration, "diff": diff_dur, "mismatch": mismatch_dur}
+    report["duration"] = {
+        "aaps": aaps_duration,
+        "py": py_duration,
+        "diff": diff_dur,
+        "mismatch": mismatch_dur,
+    }
 
     # suggestions
     suggestions = heuristic_suggestions(dump, trace)
@@ -395,14 +483,15 @@ def process_file(path: Path) -> Dict[str, Any]:
                 if isinstance(block, dict):
                     block = [block]
                 # если в block нет RT — добавляем
-                if not any(isinstance(o, dict) and o.get("__type__") == "RT" for o in block):
+                if not any(
+                    isinstance(o, dict) and o.get("__type__") == "RT" for o in block
+                ):
                     block.append(rt)
                     print("DEBUG: Injected RT into block")
                 dump["block"] = block
     except Exception as e:
         print("DEBUG: RT injection failed:", e)
     # ----------------------------------------
-
 
     # безопасно инициализируем block_objs
     block_objs = []
@@ -415,7 +504,10 @@ def process_file(path: Path) -> Dict[str, Any]:
         try:
             rt = dump.get("aaps_rt")
             if isinstance(rt, dict):
-                if not any(isinstance(o, dict) and o.get("__type__") == "RT" for o in block_objs):
+                if not any(
+                    isinstance(o, dict) and o.get("__type__") == "RT"
+                    for o in block_objs
+                ):
                     block_objs.append(rt)
                     print("DEBUG: Injected RT into block_objs")
         except Exception as e:
@@ -429,7 +521,9 @@ def process_file(path: Path) -> Dict[str, Any]:
     except Exception as e:
         err_path = Path("aaps_emulator/data/cache/parsed_block_on_error.json")
         err_path.parent.mkdir(parents=True, exist_ok=True)
-        err_path.write_text(json.dumps(dump, ensure_ascii=False, indent=2), encoding="utf-8")
+        err_path.write_text(
+            json.dumps(dump, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         print(f"Error while building inputs, dump saved to {err_path}")
         return {
             "file": str(path),
@@ -462,7 +556,9 @@ def process_file(path: Path) -> Dict[str, Any]:
         err_inputs_path = Path("data/cache/failed_inputs_for_pipeline.json")
         err_inputs_path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            err_inputs_path.write_text(json.dumps(block_objs, ensure_ascii=False, indent=2), encoding="utf-8")
+            err_inputs_path.write_text(
+                json.dumps(block_objs, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
         except Exception:
             err_inputs_path.write_text(str(block_objs), encoding="utf-8")
         print(f"Error while running pipeline, inputs saved to {err_inputs_path}")
@@ -495,7 +591,10 @@ def main():
         files = sorted([p for p in d.glob("mismatch_block_*.json")])
     else:
         # default: look in mismatches/ and data/cache
-        files = sorted(list(Path("mismatches").glob("mismatch_block_*.json")) + list(Path("data/cache").glob("mismatch_block_*.json")))
+        files = sorted(
+            list(Path("mismatches").glob("mismatch_block_*.json"))
+            + list(Path("data/cache").glob("mismatch_block_*.json"))
+        )
 
     if not files:
         print("No mismatch files found.")
@@ -512,7 +611,9 @@ def main():
     if args.out:
         outp = Path(args.out)
         outp.parent.mkdir(parents=True, exist_ok=True)
-        outp.write_text(json.dumps(all_reports, ensure_ascii=False, indent=2), encoding="utf-8")
+        outp.write_text(
+            json.dumps(all_reports, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         print(f"\nWrote report to {outp}")
 
     print("\nDone.")

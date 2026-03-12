@@ -1,8 +1,9 @@
 # tests/test_heatmap.py
-import pytest
-import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pytest
 
 from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
 

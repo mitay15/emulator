@@ -1,5 +1,4 @@
 # tools/check_project_structure.py
-import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -55,6 +54,7 @@ def check_imports():
         import aaps_emulator  # noqa: F401
         import aaps_emulator.core  # noqa: F401
         import aaps_emulator.runner  # noqa: F401
+
         print("✔ Imports OK")
     except Exception as e:
         print("❌ Import error:", e)

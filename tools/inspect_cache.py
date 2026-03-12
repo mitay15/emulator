@@ -1,6 +1,5 @@
 # file: tools/inspect_cache.py
 from pathlib import Path
-import json
 
 p1 = Path("aaps_emulator/data/cache/parsed_block_on_error.json")
 p2 = Path("data/cache/failed_inputs_for_pipeline.json")

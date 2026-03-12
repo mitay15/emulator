@@ -1,15 +1,16 @@
 # tests/conftest.py
 import json
 from pathlib import Path
+
 import pytest
 
 from aaps_emulator.core.autoisf_structs import (
     AutoIsfInputs,
-    GlucoseStatusAutoIsf,
-    OapsProfileAutoIsf,
     AutosensResult,
-    MealData,
+    GlucoseStatusAutoIsf,
     IobTotal,
+    MealData,
+    OapsProfileAutoIsf,
     TempBasal,
 )
 

@@ -1,14 +1,16 @@
 # tools/debug_eventualbg.py
 from __future__ import annotations
-from pathlib import Path
-from types import SimpleNamespace
-import pandas as pd
+
+import argparse
 import json
 import logging
-import argparse
+from pathlib import Path
+from types import SimpleNamespace
 
-from aaps_emulator.runner.build_inputs import build_inputs_from_block
+import pandas as pd
+
 from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
+from aaps_emulator.runner.build_inputs import build_inputs_from_block
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -20,7 +22,9 @@ THRESHOLD = -50
 def load_csv():
     csv_path = Path("data/reports/autoisf_results.csv")
     if not csv_path.exists():
-        raise SystemExit("CSV report not found: aaps_emulator/data/reports/autoisf_results.csv")
+        raise SystemExit(
+            "CSV report not found: aaps_emulator/data/reports/autoisf_results.csv"
+        )
     df = pd.read_csv(csv_path)
     if "eventual_bg" in df.columns and "aaps_eventual_bg" in df.columns:
         df["diff_eventual_bg"] = df["eventual_bg"] - df["aaps_eventual_bg"]
@@ -30,7 +34,9 @@ def load_csv():
 def load_blocks():
     path = Path("data/cache/parsed_blocks.json")
     if not path.exists():
-        raise SystemExit("parsed_blocks.json not found. Run run.py with --dump-parsed first.")
+        raise SystemExit(
+            "parsed_blocks.json not found. Run run.py with --dump-parsed first."
+        )
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -105,8 +111,12 @@ def build_profile(block):
         autosens_adjust_targets=block.get("autosens_adjust_targets"),
         max_daily_safety_multiplier=block.get("max_daily_safety_multiplier"),
         current_basal_safety_multiplier=block.get("current_basal_safety_multiplier"),
-        high_temptarget_raises_sensitivity=block.get("high_temptarget_raises_sensitivity"),
-        low_temptarget_lowers_sensitivity=block.get("low_temptarget_lowers_sensitivity"),
+        high_temptarget_raises_sensitivity=block.get(
+            "high_temptarget_raises_sensitivity"
+        ),
+        low_temptarget_lowers_sensitivity=block.get(
+            "low_temptarget_lowers_sensitivity"
+        ),
         sensitivity_raises_target=block.get("sensitivity_raises_target"),
         resistance_lowers_target=block.get("resistance_lowers_target"),
         adv_target_adjustments=block.get("adv_target_adjustments"),
@@ -170,7 +180,11 @@ def build_iob_object(b):
         lastBolusTime=to_float(b.get("lastBolusTime")),
         netInsulin=to_float(b.get("netInsulin")),
         extendedBolusInsulin=to_float(b.get("extendedBolusInsulin")),
-        iobWithZeroTemp=build_iob_object(b.get("iobWithZeroTemp")) if b.get("iobWithZeroTemp") else None,
+        iobWithZeroTemp=(
+            build_iob_object(b.get("iobWithZeroTemp"))
+            if b.get("iobWithZeroTemp")
+            else None
+        ),
     )
 
 
@@ -268,7 +282,7 @@ def main():
         auto_block = extract_autoisf_block(blocks, row["timestamp"])
         if auto_block is None:
             continue
-        res = debug_block(auto_block, row, blocks)
+        debug_block(auto_block, row, blocks)
         analyzed += 1
 
     print("\nИТОГИ:")
@@ -276,8 +290,15 @@ def main():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Debug eventualBG differences for AutoISF blocks")
-    parser.add_argument("--timestamp", type=int, help="Timestamp (ms) to locate AutoISF block", required=False)
+    parser = argparse.ArgumentParser(
+        description="Debug eventualBG differences for AutoISF blocks"
+    )
+    parser.add_argument(
+        "--timestamp",
+        type=int,
+        help="Timestamp (ms) to locate AutoISF block",
+        required=False,
+    )
     args = parser.parse_args()
 
     if args.timestamp:

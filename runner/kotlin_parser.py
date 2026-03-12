@@ -1,9 +1,11 @@
 # aaps_emulator/runner/kotlin_parser.py
 from __future__ import annotations
+
 import re
-from typing import Any, Tuple, List, Dict
+from typing import Any, Dict, List, Tuple
 
 _number_re = re.compile(r"^-?\d+[.,]?\d*$")
+
 
 def _to_number_if_needed(s: str) -> Any:
     if s is None:
@@ -16,7 +18,9 @@ def _to_number_if_needed(s: str) -> Any:
     if s == "false":
         return False
     # quoted string
-    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+    if (s.startswith('"') and s.endswith('"')) or (
+        s.startswith("'") and s.endswith("'")
+    ):
         return s[1:-1]
     # numeric?
     if _number_re.match(s.replace(" ", "")):
@@ -29,6 +33,7 @@ def _to_number_if_needed(s: str) -> Any:
         except Exception:
             return s
     return s
+
 
 def _find_matching(s: str, start: int, open_ch: str, close_ch: str) -> int:
     """Find index of matching close_ch for open_ch at start (start points to open_ch)."""
@@ -45,6 +50,7 @@ def _find_matching(s: str, start: int, open_ch: str, close_ch: str) -> int:
                 return i
         i += 1
     raise ValueError("No matching bracket found")
+
 
 def _split_fields(content: str) -> List[Tuple[str, str]]:
     """
@@ -77,11 +83,11 @@ def _split_fields(content: str) -> List[Tuple[str, str]]:
             ch = content[i]
             if ch == "(":
                 end = _find_matching(content, i, "(", ")")
-                val = content[i:end+1]
+                val = content[i : end + 1]
                 i = end + 1
             elif ch == "[":
                 end = _find_matching(content, i, "[", "]")
-                val = content[i:end+1]
+                val = content[i : end + 1]
                 i = end + 1
             elif ch.isalpha():
                 k = i
@@ -92,7 +98,7 @@ def _split_fields(content: str) -> List[Tuple[str, str]]:
                     m += 1
                 if m < L and content[m] == "(":
                     end = _find_matching(content, m, "(", ")")
-                    val = content[i:end+1]
+                    val = content[i : end + 1]
                     i = end + 1
                 else:
                     k = i
@@ -156,6 +162,7 @@ def _split_fields(content: str) -> List[Tuple[str, str]]:
             fields.append((token, "true"))
     return fields
 
+
 def _parse_value(raw: str) -> Any:
     raw = raw.strip()
     if raw == "":
@@ -180,7 +187,7 @@ def _parse_value(raw: str) -> Any:
                 break
             if inner[i] == "[":
                 end = _find_matching(inner, i, "[", "]")
-                items.append(_parse_value(inner[i:end+1]))
+                items.append(_parse_value(inner[i : end + 1]))
                 i = end + 1
             elif inner[i].isalpha():
                 j = i
@@ -191,7 +198,7 @@ def _parse_value(raw: str) -> Any:
                     k += 1
                 if k < L and inner[k] == "(":
                     end = _find_matching(inner, k, "(", ")")
-                    items.append(_parse_value(inner[i:end+1]))
+                    items.append(_parse_value(inner[i : end + 1]))
                     i = end + 1
                 else:
                     j = i
@@ -227,6 +234,7 @@ def _parse_value(raw: str) -> Any:
     # plain value
     return _to_number_if_needed(raw)
 
+
 def parse_kotlin_object(s: str) -> Dict[str, Any]:
     """
     Parse a single Kotlin-style object string like:
@@ -238,9 +246,9 @@ def parse_kotlin_object(s: str) -> Dict[str, Any]:
     if not m:
         raise ValueError("String does not start with object name and '('")
     name = m.group(1)
-    start_par = s.find("(", m.end()-1)
+    start_par = s.find("(", m.end() - 1)
     end_par = _find_matching(s, start_par, "(", ")")
-    content = s[start_par+1:end_par].strip()
+    content = s[start_par + 1 : end_par].strip()
     obj: Dict[str, Any] = {"__type__": name}
     if content == "":
         return obj

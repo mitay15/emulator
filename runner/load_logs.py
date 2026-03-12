@@ -1,10 +1,11 @@
 # aaps_emulator/runner/load_logs.py
 from __future__ import annotations
+
 import json
+import re
 import zipfile
 from pathlib import Path
-from typing import Any, List, Dict
-import re
+from typing import Any, Dict, List
 
 from aaps_emulator.runner.kotlin_parser import parse_kotlin_object
 
@@ -21,7 +22,7 @@ OBJECT_NAMES = [
 
 OBJ_RE = re.compile(
     r".*?(?P<name>" + r"|".join(re.escape(n) for n in OBJECT_NAMES) + r")\s*\(",
-    re.DOTALL
+    re.DOTALL,
 )
 
 
@@ -111,7 +112,9 @@ def load_logs(path: str | Path) -> List[Dict[str, Any]]:
         files = _iter_all_files_recursively(p)
 
         if not files:
-            raise ValueError(f"В директории {p} не найдено ни одного файла .json/.log/.zip")
+            raise ValueError(
+                f"В директории {p} не найдено ни одного файла .json/.log/.zip"
+            )
 
         for file in files:
             if file.suffix.lower() == ".json":

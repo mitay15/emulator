@@ -1,11 +1,12 @@
 # aaps_emulator/tools/diff_report.py
 from pathlib import Path
-import pandas as pd
-import numpy as np
 
-CRIT_BG = 10          # critical difference for eventualBG
-CRIT_INSULIN = 0.20   # critical difference for insulinReq
-CRIT_RATE = 0.20      # critical difference for basal rate
+import numpy as np
+import pandas as pd
+
+CRIT_BG = 10  # critical difference for eventualBG
+CRIT_INSULIN = 0.20  # critical difference for insulinReq
+CRIT_RATE = 0.20  # critical difference for basal rate
 
 
 def load(csv_path: Path) -> pd.DataFrame:
@@ -65,23 +66,34 @@ def critical(df: pd.DataFrame):
     print("==============================")
 
     crit = df[
-        (df["abs_diff_eventual_bg"] > CRIT_BG) |
-        (df["abs_diff_insulin_req"] > CRIT_INSULIN) |
-        (df["abs_diff_rate"] > CRIT_RATE)
+        (df["abs_diff_eventual_bg"] > CRIT_BG)
+        | (df["abs_diff_insulin_req"] > CRIT_INSULIN)
+        | (df["abs_diff_rate"] > CRIT_RATE)
     ]
 
     print(f"\nTotal critical blocks: {len(crit)}")
 
     if len(crit) > 0:
         cols = [
-            "datetime", "bg",
-            "eventual_bg", "aaps_eventual_bg", "diff_eventual_bg",
-            "insulin_req", "aaps_insulin_req", "diff_insulin_req",
-            "rate", "aaps_rate", "diff_rate",
+            "datetime",
+            "bg",
+            "eventual_bg",
+            "aaps_eventual_bg",
+            "diff_eventual_bg",
+            "insulin_req",
+            "aaps_insulin_req",
+            "diff_insulin_req",
+            "rate",
+            "aaps_rate",
+            "diff_rate",
         ]
         existing = [c for c in cols if c in crit.columns]
         print("\nTop-20 critical:")
-        print(crit.sort_values("abs_diff_eventual_bg", ascending=False).head(20)[existing].to_string(index=False))
+        print(
+            crit.sort_values("abs_diff_eventual_bg", ascending=False)
+            .head(20)[existing]
+            .to_string(index=False)
+        )
 
 
 # -----------------------------
@@ -154,10 +166,17 @@ def top_errors(df: pd.DataFrame):
 
     top = df.sort_values("abs_diff_eventual_bg", ascending=False).head(20)
     cols = [
-        "datetime", "bg",
-        "eventual_bg", "aaps_eventual_bg", "diff_eventual_bg",
-        "insulin_req", "aaps_insulin_req", "diff_insulin_req",
-        "rate", "aaps_rate", "diff_rate",
+        "datetime",
+        "bg",
+        "eventual_bg",
+        "aaps_eventual_bg",
+        "diff_eventual_bg",
+        "insulin_req",
+        "aaps_insulin_req",
+        "diff_insulin_req",
+        "rate",
+        "aaps_rate",
+        "diff_rate",
     ]
     existing = [c for c in cols if c in top.columns]
     print(top[existing].to_string(index=False))

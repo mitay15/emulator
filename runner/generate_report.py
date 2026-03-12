@@ -1,7 +1,8 @@
 # aaps_emulator/runner/generate_report.py
 from __future__ import annotations
+
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 
 import pandas as pd
 

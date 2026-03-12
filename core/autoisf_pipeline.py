@@ -3,19 +3,18 @@ from __future__ import annotations
 
 import logging
 
-from aaps_emulator.runner.build_inputs import AutoIsfInputs
 from aaps_emulator.core.autoisf_module import compute_variable_sens
-from aaps_emulator.core.predictions import run_predictions, PredictionsResult
-from aaps_emulator.core.determine_basal import run_determine_basal, DosingResult
-
 from aaps_emulator.core.autoisf_structs import (
-    GlucoseStatusAutoIsf,
-    OapsProfileAutoIsf,
     AutosensResult,
-    MealData,
+    GlucoseStatusAutoIsf,
     IobTotal,
+    MealData,
+    OapsProfileAutoIsf,
     TempBasal,
 )
+from aaps_emulator.core.determine_basal import DosingResult, run_determine_basal
+from aaps_emulator.core.predictions import PredictionsResult, run_predictions
+from aaps_emulator.runner.build_inputs import AutoIsfInputs
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,9 @@ def _ensure_dataclass(value, cls):
 
 
 def _normalize_inputs(inputs: AutoIsfInputs) -> AutoIsfInputs:
-    inputs.glucose_status = _ensure_dataclass(inputs.glucose_status, GlucoseStatusAutoIsf)
+    inputs.glucose_status = _ensure_dataclass(
+        inputs.glucose_status, GlucoseStatusAutoIsf
+    )
     inputs.profile = _ensure_dataclass(inputs.profile, OapsProfileAutoIsf)
     inputs.autosens = _ensure_dataclass(inputs.autosens, AutosensResult)
     inputs.meal = _ensure_dataclass(inputs.meal, MealData)
@@ -66,13 +67,19 @@ def run_autoisf_pipeline(inputs: AutoIsfInputs):
     try:
         if _vs is None or float(_vs) <= 0:
             _autosens = getattr(inputs, "autosens", None)
-            _autosens_ratio = getattr(_autosens, "ratio", None) if _autosens is not None else None
+            _autosens_ratio = (
+                getattr(_autosens, "ratio", None) if _autosens is not None else None
+            )
             if _autosens_ratio is not None and float(_autosens_ratio) > 0:
                 variable_sens = float(_autosens_ratio)
             else:
                 _prof_sens = getattr(inputs.profile, "sens", None)
                 try:
-                    variable_sens = float(_prof_sens) if _prof_sens is not None and float(_prof_sens) > 0 else 1.0
+                    variable_sens = (
+                        float(_prof_sens)
+                        if _prof_sens is not None and float(_prof_sens) > 0
+                        else 1.0
+                    )
                 except Exception:
                     variable_sens = 1.0
         else:
@@ -83,7 +90,11 @@ def run_autoisf_pipeline(inputs: AutoIsfInputs):
     # log resolved value for debugging
     try:
         _autosens_for_log = getattr(inputs, "autosens", None)
-        _autosens_ratio_for_log = getattr(_autosens_for_log, "ratio", None) if _autosens_for_log is not None else None
+        _autosens_ratio_for_log = (
+            getattr(_autosens_for_log, "ratio", None)
+            if _autosens_for_log is not None
+            else None
+        )
         _prof_sens_for_log = getattr(inputs.profile, "sens", None)
         logger.debug(
             "variable_sens resolved to %s (computed=%s, autosens=%s, profile.sens=%s)",

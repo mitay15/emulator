@@ -1,7 +1,8 @@
 # tests/test_plot_predbgs.py
-import pytest
-import matplotlib.pyplot as plt
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pytest
 
 from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
 

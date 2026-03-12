@@ -1,31 +1,46 @@
 # aaps_emulator/core/autoisf_module.py
 from __future__ import annotations
-from typing import Any, Sequence
-from aaps_emulator.core.utils import round_half_even
 
 import logging
+from typing import Any, Sequence
 
 logger = logging.getLogger("autoisf_debug")
 if not logger.handlers:
     logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
+
 def _clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
-def within_limits(lift, minISFReduction, maxISFReduction, sensitivityRatio, temptargetSet, high_temptarget_raises_sensitivity, target_bg, normalTarget):
+
+def within_limits(
+    lift,
+    minISFReduction,
+    maxISFReduction,
+    sensitivityRatio,
+    temptargetSet,
+    high_temptarget_raises_sensitivity,
+    target_bg,
+    normalTarget,
+):
     if lift < minISFReduction:
         lift = minISFReduction
     elif lift > maxISFReduction:
         lift = maxISFReduction
 
-    if high_temptarget_raises_sensitivity and temptargetSet and target_bg > normalTarget:
+    if (
+        high_temptarget_raises_sensitivity
+        and temptargetSet
+        and target_bg > normalTarget
+    ):
         finalISF = lift * sensitivityRatio
     elif lift >= 1:
         finalISF = max(lift, sensitivityRatio)
     else:
         finalISF = min(lift, sensitivityRatio)
     return finalISF
+
 
 def interpolate_range(xdata, lower_weight, higher_weight):
     polyX = [50.0, 60.0, 80.0, 90.0, 100.0, 110.0, 150.0, 180.0, 200.0]
@@ -38,12 +53,13 @@ def interpolate_range(xdata, lower_weight, higher_weight):
         newVal = polyY[-1]
         for i in range(1, len(polyX)):
             if xdata <= polyX[i]:
-                lowX, topX = polyX[i-1], polyX[i]
-                lowV, topV = polyY[i-1], polyY[i]
+                lowX, topX = polyX[i - 1], polyX[i]
+                lowV, topV = polyY[i - 1], polyY[i]
                 denom = topX - lowX if topX - lowX != 0 else 1.0
                 newVal = lowV + (topV - lowV) * (xdata - lowX) / denom
                 break
     return newVal * (higher_weight if xdata > 100 else lower_weight)
+
 
 # -----------------------------
 # Low-level helpers (AAPS-style)
@@ -69,6 +85,7 @@ def _bg_accel_isf_factor(gs, profile) -> float:
         factor = 1.0
     return factor
 
+
 def _bg_brake_isf_factor(gs, profile) -> float:
     delta = getattr(gs, "delta", 0.0) or 0.0
     short = getattr(gs, "shortAvgDelta", 0.0) or 0.0
@@ -88,6 +105,7 @@ def _bg_brake_isf_factor(gs, profile) -> float:
     auto_max = getattr(profile, "autoISF_max", 2.0) or 2.0
     return _clamp(factor, auto_min, auto_max)
 
+
 def _pp_isf_factor(meal, profile) -> float:
     if meal is None:
         return 1.0
@@ -99,6 +117,7 @@ def _pp_isf_factor(meal, profile) -> float:
     auto_min = getattr(profile, "autoISF_min", 0.5) or 0.5
     auto_max = getattr(profile, "autoISF_max", 2.0) or 2.0
     return _clamp(factor, auto_min, auto_max)
+
 
 def _parabola_isf_factor(gs, profile) -> float:
     corr = getattr(gs, "corrSqu", 0.0) or 0.0
@@ -112,6 +131,7 @@ def _parabola_isf_factor(gs, profile) -> float:
     auto_min = getattr(profile, "autoISF_min", 0.5) or 0.5
     auto_max = getattr(profile, "autoISF_max", 2.0) or 2.0
     return _clamp(factor, auto_min, auto_max)
+
 
 def _dura_isf_factor(gs, profile) -> float:
     minutes = getattr(gs, "duraISFminutes", 0.0) or 0.0
@@ -127,8 +147,10 @@ def _dura_isf_factor(gs, profile) -> float:
     auto_max = getattr(profile, "autoISF_max", 2.0) or 2.0
     return _clamp(factor, auto_min, auto_max)
 
+
 def _range_isf_factor(profile) -> float:
     return 1.0
+
 
 def compute_bg_isf_factor(glucose_status, profile):
     f_bg_accel = _bg_accel_isf_factor(glucose_status, profile)
@@ -140,6 +162,7 @@ def compute_bg_isf_factor(glucose_status, profile):
     auto_min = getattr(profile, "autoISF_min", 0.5)
     auto_max = getattr(profile, "autoISF_max", 2.0)
     return _clamp(factor, auto_min, auto_max)
+
 
 def compute_pp_isf_factor(glucose_status, meal, profile):
     if meal is None:
@@ -153,12 +176,20 @@ def compute_pp_isf_factor(glucose_status, meal, profile):
         return 1.0
     return _pp_isf_factor(meal, profile)
 
+
 def compute_exercise_factor(profile):
     if not getattr(profile, "exercise_mode", False):
         return 1.0
     return 1.0
 
-def compute_final_isf_factor(glucose_status: Any, profile: Any, meal: Any, autosens: Any, iob_array: Sequence[Any]) -> float:
+
+def compute_final_isf_factor(
+    glucose_status: Any,
+    profile: Any,
+    meal: Any,
+    autosens: Any,
+    iob_array: Sequence[Any],
+) -> float:
     if not getattr(profile, "enable_autoISF", True):
         return 1.0
     f_bg_accel = _bg_accel_isf_factor(glucose_status, profile)
@@ -174,12 +205,16 @@ def compute_final_isf_factor(glucose_status: Any, profile: Any, meal: Any, autos
     return final_factor
 
 
-def compute_variable_sens(glucose_status, profile, meal, autosens, iob_array, sensitivity_ratio: float = 1.0) -> float:
+def compute_variable_sens(
+    glucose_status, profile, meal, autosens, iob_array, sensitivity_ratio: float = 1.0
+) -> float:
     try:
-        logger.debug("compute_variable_sens called: profile.variable_sens=%r _from_rt=%r autosens.ratio=%r",
-                     getattr(profile, "variable_sens", None),
-                     getattr(profile, "_variable_sens_from_rt", False),
-                     getattr(autosens, "ratio", None))
+        logger.debug(
+            "compute_variable_sens called: profile.variable_sens=%r _from_rt=%r autosens.ratio=%r",
+            getattr(profile, "variable_sens", None),
+            getattr(profile, "_variable_sens_from_rt", False),
+            getattr(autosens, "ratio", None),
+        )
         if profile is None:
             return float(getattr(autosens, "ratio", 1.0) or 1.0)
 
@@ -199,20 +234,32 @@ def compute_variable_sens(glucose_status, profile, meal, autosens, iob_array, se
             try:
                 variable_sens = float(raw_vs)
             except Exception:
-                variable_sens = float(getattr(profile, "sens", getattr(autosens, "ratio", 1.0) or 1.0))
+                variable_sens = float(
+                    getattr(profile, "sens", getattr(autosens, "ratio", 1.0) or 1.0)
+                )
         else:
-            variable_sens = float(getattr(profile, "sens", getattr(autosens, "ratio", 1.0) or 1.0))
+            variable_sens = float(
+                getattr(profile, "sens", getattr(autosens, "ratio", 1.0) or 1.0)
+            )
 
         try:
             autosens_ratio = float(getattr(autosens, "ratio", 1.0) or 1.0)
         except Exception:
             autosens_ratio = 1.0
 
-        logger.debug("Before combining: variable_sens=%r autosens_ratio=%r", variable_sens, autosens_ratio)
+        logger.debug(
+            "Before combining: variable_sens=%r autosens_ratio=%r",
+            variable_sens,
+            autosens_ratio,
+        )
         variable_sens = variable_sens * autosens_ratio * float(sensitivity_ratio or 1.0)
 
         if abs(variable_sens) > 10:
-            logger.debug("Normalizing combined variable_sens %r -> %r", variable_sens, variable_sens / 100.0)
+            logger.debug(
+                "Normalizing combined variable_sens %r -> %r",
+                variable_sens,
+                variable_sens / 100.0,
+            )
             variable_sens = variable_sens / 100.0
 
         # apply clamps
@@ -231,7 +278,13 @@ def compute_variable_sens(glucose_status, profile, meal, autosens, iob_array, se
     except Exception:
         logger.exception("compute_variable_sens fallback")
         try:
-            fallback = float(getattr(profile, "variable_sens", getattr(profile, "sens", getattr(autosens, "ratio", 1.0))))
+            fallback = float(
+                getattr(
+                    profile,
+                    "variable_sens",
+                    getattr(profile, "sens", getattr(autosens, "ratio", 1.0)),
+                )
+            )
             if abs(fallback) > 10:
                 fallback = fallback / 100.0
             return float(fallback)

@@ -1,11 +1,12 @@
 # aaps_emulator/core/glucose_status_autoisf.py
 from __future__ import annotations
+
+import math
 from dataclasses import dataclass
 from typing import List, Optional
-import math
 
 from .autoisf_structs import GlucoseStatusAutoIsf
-from aaps_emulator.core.utils import round_half_even
+
 
 @dataclass
 class BucketedEntry:
@@ -14,7 +15,10 @@ class BucketedEntry:
     recalculated: float
     filledGap: bool = False
 
-def compute_glucose_status_autoisf(data: List[BucketedEntry]) -> Optional[GlucoseStatusAutoIsf]:
+
+def compute_glucose_status_autoisf(
+    data: List[BucketedEntry],
+) -> Optional[GlucoseStatusAutoIsf]:
     """
     Port of AAPS GlucoseStatusCalculatorAutoIsf.
     data: list newest->oldest (index 0 is newest)
@@ -117,11 +121,11 @@ def compute_glucose_status_autoisf(data: List[BucketedEntry]) -> Optional[Glucos
         bg = e.recalculated / scale_bg
         sx += ti
         sy += bg
-        sx2 += ti ** 2
-        sx3 += ti ** 3
-        sx4 += ti ** 4
+        sx2 += ti**2
+        sx3 += ti**3
+        sx4 += ti**4
         sxy += ti * bg
-        sx2y += (ti ** 2) * bg
+        sx2y += (ti**2) * bg
 
         if n < 4:
             continue
@@ -163,7 +167,7 @@ def compute_glucose_status_autoisf(data: List[BucketedEntry]) -> Optional[Glucos
             if ej.recalculated <= 39 or ej.filledGap:
                 continue
             dt = (ej.timestamp - time0) / 1000.0 / scale_time
-            bgj = a * dt ** 2 + b * dt + c
+            bgj = a * dt**2 + b * dt + c
             s_squares += (ej.recalculated / scale_bg - y_mean) ** 2
             s_residual += (ej.recalculated / scale_bg - bgj) ** 2
 
@@ -177,7 +181,7 @@ def compute_glucose_status_autoisf(data: List[BucketedEntry]) -> Optional[Glucos
             duraP = -ti * scale_time / 60.0
             delta5 = 5 * 60 / scale_time
             deltaPl = -scale_bg * (a * (-delta5) ** 2 - b * delta5)
-            deltaPn = scale_bg * (a * delta5 ** 2 + b * delta5)
+            deltaPn = scale_bg * (a * delta5**2 + b * delta5)
             bgAcc = 2 * a * scale_bg
             best = dict(
                 a0=c * scale_bg,

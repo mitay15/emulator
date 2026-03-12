@@ -9,7 +9,7 @@ __pycache__/
 *.pyc
 .vscode/
 .idea/
-data/reports/ 
-project_dump/ 
-*.png 
-*.txt 
+data/reports/
+project_dump/
+*.png
+*.txt

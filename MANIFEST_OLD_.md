@@ -1,4 +1,4 @@
-# 📦 **ОФИЦИАЛЬНАЯ СПЕЦИФИКАЦИЯ ПРОЕКТА `aaps_emulator`**  
+# 📦 **ОФИЦИАЛЬНАЯ СПЕЦИФИКАЦИЯ ПРОЕКТА `aaps_emulator`**
 *(версия 3.0 — после интеграции AutoISF pipeline, предикторов и GlucoseStatus)*
 
 ---
@@ -86,12 +86,12 @@ aaps_emulator/
 
 Полный порт AAPS:
 
-- duraISFminutes  
-- duraISFaverage  
-- параболическая регрессия (a0, a1, a2)  
-- deltaPl / deltaPn  
-- bgAcceleration  
-- corrSqu  
+- duraISFminutes
+- duraISFaverage
+- параболическая регрессия (a0, a1, a2)
+- deltaPl / deltaPn
+- bgAcceleration
+- corrSqu
 
 Это **точная копия GlucoseStatusCalculatorAutoIsf из AAPS 3.4**.
 
@@ -114,18 +114,18 @@ aaps_emulator/
 
 Полный порт блока предикторов AAPS 3.4:
 
-- IOBpredBG  
-- COBpredBG  
-- UAMpredBG  
-- ZTpredBG  
-- carb impact  
-- UAM impact  
-- CI duration  
-- remainingCIpeak  
-- minPredBG  
-- minGuardBG  
-- avgPredBG  
-- eventualBG  
+- IOBpredBG
+- COBpredBG
+- UAMpredBG
+- ZTpredBG
+- carb impact
+- UAM impact
+- CI duration
+- remainingCIpeak
+- minPredBG
+- minGuardBG
+- avgPredBG
+- eventualBG
 
 Это **самый большой и важный модуль**, полностью повторяющий DetermineBasalSMB (predictor section).
 
@@ -135,16 +135,16 @@ aaps_emulator/
 
 Твой оригинальный модуль AutoISF 3.0.1:
 
-- bgAccel_ISF  
-- bgBrake_ISF  
-- parabola_ISF  
-- dura_ISF  
-- pp_ISF  
-- range_ISF  
-- compute_bg_isf_factor  
-- compute_pp_isf_factor  
-- compute_final_isf_factor  
-- compute_variable_sens  
+- bgAccel_ISF
+- bgBrake_ISF
+- parabola_ISF
+- dura_ISF
+- pp_ISF
+- range_ISF
+- compute_bg_isf_factor
+- compute_pp_isf_factor
+- compute_final_isf_factor
+- compute_variable_sens
 
 Этот файл **не меняется** — он полностью корректен.
 
@@ -166,15 +166,15 @@ aaps_emulator/
 
 Единая точка входа AutoISF:
 
-1. compute_core_predictions  
-2. compute_variable_sens  
+1. compute_core_predictions
+2. compute_variable_sens
 3. возвращает `(variable_sens, pred)`
 
 Используется для тестов и сравнения с AAPS.
 
 ---
 
-# 🔵 **3.8. core/autoisf_algorithm.py**  
+# 🔵 **3.8. core/autoisf_algorithm.py**
 *(включён по твоей просьбе)*
 
 Это **упрощённый SMB‑хвост**, который:
@@ -235,8 +235,8 @@ duration = 30
 
 Отладочные инструменты:
 
-- debug_eventualbg.py  
-- diff_report.py  
+- debug_eventualbg.py
+- diff_report.py
 - autoisf_debug_runner.py ← новый раннер для AutoISF pipeline
 
 ---
@@ -281,20 +281,20 @@ RT (rate, insulinReq)
 
 # 5. Статус проекта
 
-### ✔ AutoISF полностью реализован  
-### ✔ GlucoseStatusAutoISF полностью реализован  
-### ✔ predBGs полностью реализованы  
-### ✔ eventualBG совпадает с AAPS  
-### ✔ variable_sens совпадает с AAPS  
-### ✔ архитектура полностью разделена и чистая  
+### ✔ AutoISF полностью реализован
+### ✔ GlucoseStatusAutoISF полностью реализован
+### ✔ predBGs полностью реализованы
+### ✔ eventualBG совпадает с AAPS
+### ✔ variable_sens совпадает с AAPS
+### ✔ архитектура полностью разделена и чистая
 
 ---
 
 # 6. Что можно делать дальше
 
-- перенести SMB‑логику AAPS 3.4 полностью,  
-- добавить визуализацию AutoISF факторов,  
-- добавить тесты на каждый модуль,  
+- перенести SMB‑логику AAPS 3.4 полностью,
+- добавить визуализацию AutoISF факторов,
+- добавить тесты на каждый модуль,
 - сделать GUI‑панель для анализа блоков.
 
 ---

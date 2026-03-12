@@ -1,7 +1,8 @@
 # aaps_emulator/core/autoisf_structs.py
 from __future__ import annotations
+
 from dataclasses import dataclass, field, fields
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def safe_get(obj: Any, attr: str, default: Any = None) -> Any:

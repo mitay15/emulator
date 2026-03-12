@@ -1,19 +1,20 @@
 # aaps_emulator/runner/compare_runner.py
 from __future__ import annotations
-from typing import Any, List, Dict
+
+import json
+import logging
+import os
+import time
+import traceback
+from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-import logging
-import time
-import json
-import traceback
-import os
-from dataclasses import is_dataclass, asdict
+from typing import Any, Dict, List
 
-from aaps_emulator.runner.load_logs import load_logs
-from aaps_emulator.runner.build_inputs import build_inputs_from_block
 from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
+from aaps_emulator.runner.build_inputs import build_inputs_from_block
+from aaps_emulator.runner.load_logs import load_logs
 
 logger = logging.getLogger("autoisf")
 
@@ -157,7 +158,10 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
             j = i + 1
             while j < n:
                 block_objs.append(all_parsed[j])
-                if isinstance(all_parsed[j], dict) and all_parsed[j].get("__type__") == "RT":
+                if (
+                    isinstance(all_parsed[j], dict)
+                    and all_parsed[j].get("__type__") == "RT"
+                ):
                     break
                 j += 1
             blocks.append(block_objs)
@@ -311,10 +315,20 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
                                 "autosens": _serialize(inputs.autosens),
                                 "meal": _serialize(inputs.meal),
                             },
-                            "pred": _serialize(pred) if 'pred' in locals() else None,
-                            "variable_sens_py": _serialize(variable_sens) if 'variable_sens' in locals() else None,
-                            "dosing": _serialize(dosing) if 'dosing' in locals() else None,
-                            "autoisf_debug": getattr(pred, "autoisf_debug", None) if 'pred' in locals() else None,
+                            "pred": _serialize(pred) if "pred" in locals() else None,
+                            "variable_sens_py": (
+                                _serialize(variable_sens)
+                                if "variable_sens" in locals()
+                                else None
+                            ),
+                            "dosing": (
+                                _serialize(dosing) if "dosing" in locals() else None
+                            ),
+                            "autoisf_debug": (
+                                getattr(pred, "autoisf_debug", None)
+                                if "pred" in locals()
+                                else None
+                            ),
                             "aaps_rt": _serialize(aaps_res),
                             "block": _serialize(block_objs),
                         },
@@ -344,9 +358,15 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Compare AAPS logs with Python AutoISF emulator (pipeline)")
-    parser.add_argument("--log", type=str, help="Path to AAPS log file or directory", default=None)
-    parser.add_argument("--fast", action="store_true", help="Fast mode (reserved, not used yet)")
+    parser = argparse.ArgumentParser(
+        description="Compare AAPS logs with Python AutoISF emulator (pipeline)"
+    )
+    parser.add_argument(
+        "--log", type=str, help="Path to AAPS log file or directory", default=None
+    )
+    parser.add_argument(
+        "--fast", action="store_true", help="Fast mode (reserved, not used yet)"
+    )
     args = parser.parse_args()
 
     if args.log:
@@ -360,6 +380,8 @@ if __name__ == "__main__":
         )
 
     if not paths:
-        print("Нет логов для сравнения. Укажите путь через --log или положите JSON/ZIP/LOG в data/logs/")
+        print(
+            "Нет логов для сравнения. Укажите путь через --log или положите JSON/ZIP/LOG в data/logs/"
+        )
     else:
         compare_logs(paths, fast=args.fast)

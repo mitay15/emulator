@@ -6,7 +6,7 @@ import math
 def round2(x, d=2):
     if x is None or math.isnan(x):
         return x
-    scale = 10 ** d
+    scale = 10**d
     return math.floor(x * scale + 0.5) / scale
 
 
@@ -86,7 +86,11 @@ def within_limits(
     elif lift > maxISFReduction:
         lift = maxISFReduction
 
-    if high_temptarget_raises_sensitivity and temptargetSet and target_bg > normalTarget:
+    if (
+        high_temptarget_raises_sensitivity
+        and temptargetSet
+        and target_bg > normalTarget
+    ):
         finalISF = lift * sensitivityRatio
     elif lift >= 1:
         finalISF = max(lift, sensitivityRatio)
@@ -124,11 +128,12 @@ def compute_variable_sens(
     # 1. SensitivityRatio (Autosens or TempTarget)
     # -----------------------------
     if (
-        (high_temptarget_raises_sensitivity and isTempTarget and target_bg > normalTarget)
-        or (low_temptarget_lowers_sensitivity and isTempTarget and target_bg < normalTarget)
+        high_temptarget_raises_sensitivity and isTempTarget and target_bg > normalTarget
+    ) or (
+        low_temptarget_lowers_sensitivity and isTempTarget and target_bg < normalTarget
     ):
         halfBasalTarget = profile.half_basal_exercise_target
-        c = (halfBasalTarget - normalTarget)
+        c = halfBasalTarget - normalTarget
 
         if c * (c + target_bg - normalTarget) <= 0:
             sensitivityRatio = profile.autosens_max
