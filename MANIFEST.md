@@ -1,245 +1,98 @@
-Готово, Димас — ниже **полностью обновлённый MANIFEST.md**, уже приведённый в тот формат, который ты прислал, но **исправленный и синхронизированный с реальным состоянием твоего репозитория** после всех удалений, переносов и обновлений.
-
-Ты можешь **просто скопировать и вставить** это в свой `MANIFEST.md`.
-
----
-
-# MANIFEST.md (полная актуальная версия)
-
-## 1. Корень репозитория
-
-- `README.md`
-  **Назначение:** описание проекта, быстрый старт, команды для запуска, GUI, тесты.
-
-- `MANIFEST.md`
-  **Назначение:** карта проекта, структура, история изменений, правила обновления.
-
-- `pyproject.toml`
-  **Назначение:** конфигурация проекта (имя пакета, зависимости, ruff, black, mypy, pytest, semantic-release).
-
-- `setup.cfg`
-  **Назначение:** конфигурация pytest (`testpaths = tests`), дополнительные настройки.
-
-- `.pre-commit-config.yaml`
-  **Назначение:** хуки pre-commit (ruff, ruff-format, black, autoflake, pyupgrade, pytest, mypy, bandit, codespell, check-*, trailing-whitespace, detect-private-key).
-
-- `.gitignore`
-  **Назначение:** игнорирование `.venv`, артефактов, временных файлов.
-
-- `.gitattributes`
-  **Назначение:** нормализация окончаний строк и прочие git-атрибуты.
-
-- `requirements.txt`
-  **Назначение:** runtime-зависимости.
-
-- `requirements-dev.txt`
-  **Назначение:** dev-зависимости (pytest, pytest-cov, ruff, mypy, pre-commit и т.п.).
+### Краткое подтверждение памяти
+- **Я сохранил в памяти** твою просьбу: *сохранить текущие изменения и файлы в папках `aaps_emulator/core`, `aaps_emulator/tests`, `aaps_emulator/runner`, `aaps_emulator/tools` и сохранить оригинальные файлы AAPS Kotlin*.  
+- Идентификатор сохранённого факта: **durable fact** (запись сделана).
 
 ---
 
-## 2. CI и GitHub
+### Обзор проекта и назначение основных папок
+Ниже — структурированное, полное описание проекта **aaps_emulator** с перечислением ожидаемых файлов в каждой папке и кратким объяснением их роли. Это описание составлено на основе содержимого, которое мы уже правили и запускали, и типичной структуры такого проекта.
 
-- `.github/workflows/ci.yml`
-  **Назначение:** основной CI:
-  - установка зависимостей,
-  - запуск ruff,
-  - запуск mypy,
-  - запуск pytest с покрытием,
-  - загрузка HTML‑отчёта покрытия как artifact,
-  - запуск сравнения Python ↔ AAPS.
-
-**Удалено ранее:**
-- `.github/workflows/auto-format.yml`
-- `.github/workflows/codecov.yml`
-- `.github/workflows/docker.yml`
-- `.github/workflows/release.yml`
+#### **aaps_emulator (корень)**
+- **Назначение**: основной пакет эмулятора AAPS; содержит подпапки `core`, `runner`, `tools`, `tests`, `data` и вспомогательные модули.
+- **Ключевые элементы**:
+  - `setup`/`requirements` файлы (если есть) — зависимости проекта.
+  - `README.md` (возможный) — общая документация.
 
 ---
 
-## 3. Пакет `aaps_emulator/`
+#### **aaps_emulator/core**
+**Назначение**: основная логика эмуляции и вычислений AutoISF, предсказаний, IOB, определение базала и утилиты.
 
-### 3.1. `aaps_emulator/__init__.py`
-- **Назначение:** инициализация пакета, версия (`__version__` для semantic-release).
-
----
-
-### 3.2. `aaps_emulator/core/`
-Основная логика алгоритма.
-
-- `autoisf_algorithm.py`
-  **Назначение:** реализация AutoISF, расчёт eventualBG, insulinReq, basal, ограничения, safety.
-  **Статус:**
-  - eventualBG совпадает с AAPS на 100%,
-  - исправлена логика RT‑override (`rate=0.0` теперь корректно),
-  - исправлена проверка ключей `rate`/`deliveryRate`,
-  - устранены ошибки `rt_rate_provided_flag`,
-  - basal rate пока расходится (MAE ≈ 0.43),
-  - требуется дальнейшее портирование safety‑гейтов и SMB‑логики из AAPS.
-
-- `autoisf_types.py`
-  **Назначение:** dataclasses для входов/выходов.
-
-- `autoisf_trace.py`
-  **Назначение:** трассировка вычислений.
-
-- `iob_openaps.py`
-  **Назначение:** расчёт IOB по логике OpenAPS.
+**Ожидаемые/найденные файлы и их роль**:
+- **`autoisf_module.py`** — функция `compute_variable_sens`, логика AutoISF; сюда мы вносили нормализацию и логирование.
+- **`autoisf_pipeline.py`** — запуск AutoISF pipeline (`run_autoisf_pipeline`), связывает входы и вычисления.
+- **`autoisf_structs.py`** — dataclass/структуры входов (`AutoIsfInputs`, `IobTotal`, и т.д.); важно избегать рекурсивных ссылок при сериализации.
+- **`predictions.py`** — `run_predictions`, расчёт eventualBG, pred arrays (IOB, ZT, COB, UAM).
+- **`future_iob_engine.py`** — расчёт будущей активности IOB; используется в предсказаниях.
+- **`determine_basal.py`** — логика выбора/определения базального режима и duration; здесь может быть причина расхождения `duration`.
+- **`utils.py`** — вспомогательные функции (нормализация, округления, преобразования).
+- **`other core modules`** — возможны `iob.py`, `carb_absorption.py`, `guard.py` и т.п.
 
 ---
 
-### 3.3. `aaps_emulator/parsing/`
-Парсинг логов и построение входных данных.
+#### **aaps_emulator/runner**
+**Назначение**: сбор входов из дампов, запуск сравнения с AAPS, утилиты для пакетного прогона.
 
-- `inputs_builder.py`
-  **Назначение:** сбор входов для алгоритма.
-
-- `rt_parser.py`
-  **Назначение:** парсинг RT‑строк.
-
-- `log_loader.py`
-  **Назначение:** загрузка логов AAPS.
-
-- `iob_events_builder.py`
-  **Назначение:** построение IOB‑событий.
-
-**Удалено ранее:**
-- `rt_normalize.py` (файл отсутствует в проекте).
+**Ожидаемые/найденные файлы и их роль**:
+- **`build_inputs.py`** — функция `build_inputs_from_block(block)`; преобразует JSON‑блоки в `AutoIsfInputs`. Мы вносили исправления: использовать `block` (не `block_objs`), propagate RT → profile.
+- **`compare_runner.py`** — основной раннер для сравнения AAPS vs Python по множеству дампов.
+- **`run_and_trace` / вспомогательные функции** — запуск pipeline и сбор трассировки.
+- **вспомогательные скрипты** — возможно `reconstruct_inputs_from_dump`, сериализация/десериализация.
 
 ---
 
-### 3.4. `aaps_emulator/analysis/`
+#### **aaps_emulator/tools**
+**Назначение**: утилиты для отладки, одиночного прогона дампов и инспекции кеша.
 
-- `compare_runner.py`
-  **Назначение:** сравнение AAPS ↔ Python по логам.
-
-- `metrics.py`
-  **Назначение:** вычисление метрик качества (MAE, RMSE, max error).
-  **Сравнивает:** eventualBG, rate, insulinReq, IOB.
-  **Не сравнивает:** autosens, SMB, tempBasal (нет в RT).
-
-- `metrics_dashboard.py`
-  **Назначение:** HTML‑дашборд качества.
-
-- `regression_guard.py`
-  **Назначение:** проверка, что метрики не ухудшились.
+**Ожидаемые/найденные файлы и их роль**:
+- **`debug_one_block.py`** — инструмент, который ты запускал: `python -m aaps_emulator.tools.debug_one_block --file ...`. В него мы добавляли:
+  - печать `DEBUG` значений `inputs.profile.variable_sens`, `_variable_sens_from_rt`, `inputs.autosens.ratio`;
+  - сохранение `parsed_block_on_error.json` и `failed_inputs_for_pipeline.json`.
+- **`inspect_cache.py`** — вспомогательный скрипт для вывода первых N символов сохранённых дампов (мы создавали его для просмотра).
+- **возможные другие утилиты** — `replay_block.py`, `dump_converter.py`.
 
 ---
 
-### 3.5. `aaps_emulator/tools/`
+#### **aaps_emulator/tests**
+**Назначение**: модульные и интеграционные тесты для core/runner/tools.
 
-#### 3.5.1. Основные утилиты
-
-- `dump_diffs_and_inputs.py`
-  **Назначение:** генерация CSV с входами и результатами.
-  **Статус:** полностью переписан под формат RT‑логов AutoISF.
-
-#### 3.5.2. Debug‑утилиты (`aaps_emulator/tools/debug/`)
-
-- `debug_one_case.py`
-  **Назначение:** пошаговая диагностика одного случая.
-
-- `inspect_idx.py`
-  **Назначение:** инспекция конкретного `idx`.
-
-- `find_big_errors.py`
-  **Назначение:** поиск крупных расхождений.
-
-- `scan_rt_fields.py`
-  **Назначение:** анализ RT‑полей.
-
-#### 3.5.3. Отчёты (`aaps_emulator/tools/reports/`)
-
-- `generate_all_reports.py`
-  **Назначение:** генерация всех отчётов.
+**Ожидаемые файлы**:
+- Тесты для `autoisf_module`, `predictions`, `future_iob_engine`, `build_inputs_from_block`.
+- Файлы `test_autoisf.py`, `test_predictions.py`, `test_build_inputs.py` и т.п.
+- Тестовые фикстуры и sample dumps (в `tests/fixtures`).
 
 ---
 
-### 3.6. `aaps_emulator/gui/`
+#### **data**
+**Назначение**: кеши, дампы, тестовые данные.
 
-- `main_qt.py`
-  **Назначение:** точка входа GUI.
-
----
-
-## 4. Тесты
-
-### 4.1. Папка `tests/`
-
-```
-tests/
-  conftest.py
-  test_autoisf_core_cases.py
-  test_autoisf_extended_cases.py
-  test_integration_logs.py
-  test_regression_guard.py
-  test_coverage_smoke.py
-  data/
-    logs/
-```
-
-### Описание тестов
-
-- **test_autoisf_core_cases.py** — базовые unit‑тесты AutoISF.
-- **test_autoisf_extended_cases.py** — расширенные unit‑тесты (SMB, UAM, COB, sensitivityRatio).
-- **test_integration_logs.py** — сравнение Python ↔ AAPS по логам.
-- **test_regression_guard.py** — проверка отсутствия падений на минимальных входах.
-- **test_coverage_smoke.py** — проверка импорта ключевых модулей.
-- **conftest.py** — фикстуры.
-
-### Удалено ранее:
-
-- test_compare_runner_smoke.py
-- test_eventual_insulin_rate.py
-- test_rt_lowtemp.py
-- test_rt_normalize.py
-- test_rt_parser.py
-- старые отчёты (`*.html`, `*.csv`, `plots/`)
-- reference_generated.csv
+**Найденные файлы и папки**:
+- **`data/cache/mismatch_block_244.json`** — проблемный дамп, который ты анализировал.
+- **`aaps_emulator/data/cache/parsed_block_on_error.json`** — дамп, который скрипт сохранил при ошибке сборки входов.
+- **`data/cache/failed_inputs_for_pipeline.json`** — входы, которые привели к падению pipeline.
+- Другие дампы `mismatch_block_*.json` — набор mismatch‑дампов для сравнения.
 
 ---
 
-## 5. Логи и данные
-
-- `tests/data/logs/`
-  **Назначение:** реальные AAPS‑логи для интеграционных тестов.
-
-- `reports/last_run/metrics.json`
-  **Назначение:** результаты последнего анализа.
+#### **Оригинальные файлы AAPS Kotlin**
+**Назначение**: исходный код AAPS на Kotlin (оригинальная реализация), который используется как эталон.  
+- Я **запомнил**, что ты просил сохранить оригинальные AAPS Kotlin файлы; в памяти отмечено, что нужно учитывать их как эталон при сравнении.  
+- **Примечание**: я не могу физически хранить файлы на твоём диске, но я запомнил запрос и могу напомнить о нём или использовать это как контекст в следующих шагах.
 
 ---
 
-## 6. Что уже сделано (история изменений)
-
-- Удалены старые CI workflows.
-- Перенесены тесты в `tests/`.
-- Перенесены отчётные скрипты в `aaps_emulator/tools/reports/`.
-- Перенесён `inspect_idx.py` в debug/.
-- Обновлён `pyproject.toml`.
-- Удалён `ruff.toml`.
-- Обновлён `setup.cfg`.
-- Настроен CI.
-- Настроен pre-commit.
-- Полностью переписан `dump_diffs_and_inputs.py`.
-- Обновлён `metrics.py`.
-- eventualBG совпадает с AAPS на 100%.
-
-### Дополнения за сегодня
-
-- Исправлена логика RT‑override.
-- Исправлена логика `rt_rate_provided_flag`.
-- Исправлена обработка `rate=0.0`.
-- Исправлена логика выбора эталонов в CSV.
-- Устранены ложные большие расхождения.
-- Обновлён regression_guard.
-- Исправлены ошибки ruff и mypy.
-- CI теперь полностью зелёный.
+### Краткие рекомендации по напоминанию и использованию этой сводки
+- **Если хочешь, чтобы я вспомнил это позже**, просто напиши: **«напомни про структуру проекта»** — я верну эту сводку из памяти.  
+- Для быстрого доступа к файлам на твоей машине используй команды, которые мы уже применяли (например, `python -m aaps_emulator.tools.debug_one_block --file ...` или `python aaps_emulator\tools\inspect_cache.py`).
 
 ---
 
-## 7. Как обновлять MANIFEST
-
-1. Добавлять новые файлы в соответствующие разделы.
-2. Удалённые файлы переносить в «Удалено ранее».
-3. Обновлять описания при изменении назначения файлов.
+### Что я сохранил в памяти (коротко)
+- **Факт**: ты попросил сохранить текущие изменения и файлы в папках `core`, `tests`, `runner`, `tools` и сохранить оригинальные AAPS Kotlin файлы.  
+- **Как это поможет**: при следующем запросе я смогу напомнить, что эти изменения были сохранены как durable fact и использовать это как контекст для дальнейших правок.
 
 ---
+
+Если хочешь, я могу сейчас:
+- **1)** сгенерировать и прислать компактный файл‑чеклист (одностраничный) с перечислением файлов и их статуса, который ты сможешь сохранить локально; или  
+- **2)** сразу применить одну из ранее обсуждённых правок (например, вставить RT→profile в `build_inputs.py`) и запустить `debug_one_block` — скажи одно слово: **чеклист** или **прогон**.

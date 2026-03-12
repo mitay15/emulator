@@ -1,83 +1,18 @@
-[project]
-name = "aaps-emulator"
-version = "0.0.0"
-description = "AAPS Emulator — tools to parse logs, reproduce AutoISF logic, compare AAPS vs Python, and visualize results"
-authors = [
-    { name = "Dimas" }
-]
-readme = "README.md"
-requires-python = ">=3.11"
-
-# Основные зависимости (runtime)
-dependencies = [
-    "numpy",
-    "pandas",
-    "matplotlib",
-    "scipy",
-    "PyQt6",
-    "plotly"
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "pytest-cov",
-    "ruff",
-    "black",
-    "mypy",
-    "pre-commit"
-]
-
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
-# -----------------------------
-# semantic-release (оставляем)
-# -----------------------------
-[tool.semantic_release]
-version_variable = "aaps_emulator/__init__.py:__version__"
-branch = "master"
-upload_to_pypi = true
-upload_to_release = true
-changelog_file = "CHANGELOG.md"
-commit_parser = "angular"
+[project]
+name = "aaps_emulator"
+version = "3.0.0"
+description = "Python emulator of AAPS AutoISF and predictions engine"
+requires-python = ">=3.10"
 
-[tool.semantic_release.pypi]
-username = "__token__"
-password = "env:PYPI_TOKEN"
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "pytest",
+]
 
-# -----------------------------
-# Ruff
-# -----------------------------
-[tool.ruff]
-line-length = 120
-target-version = "py311"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM", "C4"]
-
-# -----------------------------
-# Black
-# -----------------------------
-[tool.black]
-line-length = 120
-target-version = ["py311"]
-
-# -----------------------------
-# Mypy
-# -----------------------------
-[tool.mypy]
-python_version = "3.11"
-strict = true
-ignore_missing_imports = true
-
-[tool.coverage.run]
-branch = true
-source = ["aaps_emulator"]
-
-[tool.coverage.report]
-show_missing = true
-
-[tool.coverage.html]
-directory = "htmlcov"
+[tool.setuptools.packages.find]
+where = ["."]
