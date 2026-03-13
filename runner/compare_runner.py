@@ -289,6 +289,17 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
     test_mode = return_stats
 
     for local_idx, block_objs in enumerate(blocks, start=1):
+        # ---------------------------------------------------------
+        # SAVE CLEAN BLOCKS (block_objs) IF REQUESTED
+        # ---------------------------------------------------------
+        if args.extract_clean:
+            clean_dir = Path("data") / "clean"
+            clean_dir.mkdir(parents=True, exist_ok=True)
+
+            clean_path = clean_dir / f"block_{local_idx:05d}.json"
+            with clean_path.open("w", encoding="utf-8") as f:
+                json.dump(block_objs, f, ensure_ascii=False, indent=2)
+
         idx: int = local_idx
 
         if test_mode:
@@ -560,6 +571,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         description="Compare AAPS logs with Python AutoISF emulator (pipeline)"
+    )
+
+    parser.add_argument(
+        "--extract-clean",
+        action="store_true",
+        help="Extract clean AutoISF blocks into data/clean/"
     )
 
     parser.add_argument(

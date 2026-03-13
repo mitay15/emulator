@@ -4,26 +4,24 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
-from runner.compare_runner import compare_logs
+from runner.compare_runner import extract_blocks_from_logs
 
 
-def save_clean_blocks(clean_rows: List[Dict[str, Any]], out_dir: Path) -> None:
+def save_clean_blocks(blocks: List[List[Dict[str, Any]]], out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    for r in clean_rows:
-        idx = r.get("idx")
+    for idx, block in enumerate(blocks, start=1):
         out_path = out_dir / f"block_{idx:04d}.json"
         with out_path.open("w", encoding="utf-8") as f:
-            json.dump(r, f, ensure_ascii=False, indent=2)
+            json.dump(block, f, ensure_ascii=False, indent=2)
 
-    print(f"Saved {len(clean_rows)} clean blocks to {out_dir}")
+    print(f"Saved {len(blocks)} clean blocks to {out_dir}")
 
 
 def main() -> None:
     logs_dir = Path("data") / "logs"
     assert logs_dir.exists(), f"Logs directory not found: {logs_dir}"
 
-    # Собираем все файлы логов
     paths = (
         list(logs_dir.rglob("*.json"))
         + list(logs_dir.rglob("*.zip"))
@@ -31,20 +29,13 @@ def main() -> None:
     )
     assert paths, f"No log files found in {logs_dir}"
 
-    print(f"Found {len(paths)} log files. Running compare...")
+    print(f"Found {len(paths)} log files. Extracting clean blocks...")
 
-    stats = compare_logs(paths=paths, fast=False, return_stats=True)
-    rows = stats.get("results") or []
+    # ВАЖНО: мы извлекаем block_objs, а не rows
+    blocks = extract_blocks_from_logs(paths)
 
-    # Фильтруем только чистые блоки
-    clean_rows = [r for r in rows if not r.get("fallback")]
-
-    print(f"Total blocks: {len(rows)}")
-    print(f"Clean blocks: {len(clean_rows)}")
-    print(f"Fallback blocks: {len(rows) - len(clean_rows)}")
-
-    out_dir = Path("tests") / "data" / "aaps_parity"
-    save_clean_blocks(clean_rows, out_dir)
+    out_dir = Path("data") / "clean"
+    save_clean_blocks(blocks, out_dir)
 
 
 if __name__ == "__main__":
