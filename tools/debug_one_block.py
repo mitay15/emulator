@@ -26,12 +26,12 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
-from aaps_emulator.core.future_iob_engine import generate_future_iob
-from aaps_emulator.core.predictions import run_predictions
+from core.autoisf_pipeline import run_autoisf_pipeline
+from core.future_iob_engine import generate_future_iob
+from core.predictions import run_predictions
 
 # Import project modules (assumes script runs from project root)
-from aaps_emulator.runner.build_inputs import build_inputs_from_block
+from runner.build_inputs import build_inputs_from_block
 
 # Tolerances
 TOL_EVENTUAL_BG = 0.5  # mg/dL

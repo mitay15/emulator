@@ -5,10 +5,10 @@ import math
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from aaps_emulator.core.autoisf_structs import IobTotal
-from aaps_emulator.core.future_iob_engine import InsulinCurveParams, generate_future_iob
-from aaps_emulator.core.utils import round_half_even
-from aaps_emulator.runner.build_inputs import AutoIsfInputs
+from core.autoisf_structs import IobTotal
+from core.future_iob_engine import InsulinCurveParams, generate_future_iob
+from core.utils import round_half_even
+from runner.build_inputs import AutoIsfInputs
 
 
 def _round(value: float, digits: int = 0) -> float:

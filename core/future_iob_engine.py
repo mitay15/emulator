@@ -4,7 +4,7 @@ import math
 from dataclasses import dataclass
 from typing import List, Optional
 
-from aaps_emulator.core.autoisf_structs import IobTotal
+from core.autoisf_structs import IobTotal
 
 
 @dataclass

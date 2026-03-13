@@ -4,8 +4,8 @@ import argparse
 import json
 from pathlib import Path
 
-from aaps_emulator.runner.build_inputs import build_inputs_from_block
-from aaps_emulator.runner.load_logs import load_logs
+from runner.build_inputs import build_inputs_from_block
+from runner.load_logs import load_logs
 
 OUT_DIR = Path("aaps_emulator/data/cache")
 

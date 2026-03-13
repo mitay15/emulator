@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
+from core.autoisf_pipeline import run_autoisf_pipeline
 
 HEATMAP_PATH = Path("data/reports/heatmap/heatmap.png")
 

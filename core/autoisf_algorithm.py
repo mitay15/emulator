@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from aaps_emulator.core.autoisf_structs import AutoIsfInputs
-from aaps_emulator.core.predictions import run_predictions
+from core.autoisf_structs import AutoIsfInputs
+from core.predictions import run_predictions
 
 
 @dataclass

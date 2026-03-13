@@ -1,10 +1,14 @@
 # tests/test_plot_predbgs.py
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 import pytest
 
-from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
+
+from core.autoisf_pipeline import run_autoisf_pipeline
 
 PLOTS_DIR = Path("data/reports/plots")
 

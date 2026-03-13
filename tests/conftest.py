@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from aaps_emulator.core.autoisf_structs import (
+from core.autoisf_structs import (
     AutoIsfInputs,
     AutosensResult,
     GlucoseStatusAutoIsf,

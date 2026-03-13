@@ -9,8 +9,8 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
-from aaps_emulator.runner.build_inputs import build_inputs_from_block
+from core.autoisf_pipeline import run_autoisf_pipeline
+from runner.build_inputs import build_inputs_from_block
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())

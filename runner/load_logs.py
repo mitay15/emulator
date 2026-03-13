@@ -7,7 +7,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List
 
-from aaps_emulator.runner.kotlin_parser import parse_kotlin_object
+from runner.kotlin_parser import parse_kotlin_object
 
 OBJECT_NAMES = [
     "GlucoseStatusAutoIsf",

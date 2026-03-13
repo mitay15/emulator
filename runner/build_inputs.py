@@ -7,7 +7,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Dict, List
 
-from aaps_emulator.core.autoisf_structs import (
+from core.autoisf_structs import (
     AutoIsfInputs,
     AutosensResult,
     GlucoseStatusAutoIsf,
@@ -265,9 +265,10 @@ def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
                     if vs_rt is not None:
                         profile.variable_sens = vs_rt
                         setattr(profile, "_variable_sens_from_rt", True)
-                        print("DEBUG: RT variable_sens propagated into profile:", vs_rt)
-            except Exception as e:
-                print("DEBUG: propagate RT variable_sens failed:", e)
+                        # print("DEBUG: RT variable_sens propagated into profile:", vs_rt)
+            except Exception:
+                pass
+                # print("DEBUG: propagate RT variable_sens failed:", e)
             # ------------------------------------------------
 
         except Exception:
@@ -282,11 +283,10 @@ def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
                     if vs_rt is not None:
                         autosens.ratio = vs_rt
                         setattr(autosens, "_variable_sens_from_rt", True)
-                        print(
-                            "DEBUG: RT variable_sens propagated into autosens:", vs_rt
-                        )
-            except Exception as e:
-                print("DEBUG: propagate RT variable_sens into autosens failed:", e)
+                        # print("DEBUG: RT variable_sens propagated into autosens:", vs_rt)
+            except Exception:
+                pass
+                # print("DEBUG: propagate RT variable_sens into autosens failed:", e)
             # -----------------------------------------------------------
 
         except Exception:

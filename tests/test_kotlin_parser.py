@@ -1,6 +1,6 @@
 import pytest
 
-from aaps_emulator.runner.kotlin_parser import parse_kotlin_object
+from runner.kotlin_parser import parse_kotlin_object
 
 
 @pytest.mark.unit

@@ -10,13 +10,15 @@ from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
-from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
-from aaps_emulator.runner.build_inputs import build_inputs_from_block
-from aaps_emulator.runner.load_logs import load_logs
+from core.autoisf_pipeline import run_autoisf_pipeline
+from runner.build_inputs import build_inputs_from_block
+from runner.load_logs import load_logs
+
 
 logger = logging.getLogger("autoisf")
+logging.getLogger("autoisf").setLevel(logging.WARNING)
 
 
 class C:
@@ -29,8 +31,9 @@ class C:
 
 def _detect_timezone(ts: int) -> timezone:
     try:
-        dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
-        return dt.tzinfo or timezone.utc
+        # создаём datetime, но возвращаем гарантированно timezone
+        datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+        return timezone.utc
     except Exception:
         return timezone.utc
 
@@ -126,8 +129,77 @@ def dump_mismatch_json(output_dir: str, filename: str, data: Dict[str, Any]) -> 
         # не ломаем основной прогон — логируем ошибку в stdout/stderr
         logger.error(f"Failed to write mismatch JSON {filename}: {e}")
 
+def compute_metrics(aaps_list, py_list):
+    """Возвращает MAE, RMSE, max_diff и список diff’ов."""
+    # Жёсткая защита от None и пустых входов
+    if not aaps_list or not py_list:
+        return {
+            "mae": 0.0,
+            "rmse": 0.0,
+            "max_diff": 0.0,
+            "diffs": [],
+        }
+
+    diffs = []
+    for a, b in zip(aaps_list, py_list):
+        if a is None or b is None:
+            diffs.append(None)
+        else:
+            diffs.append(float(b) - float(a))
+
+    clean = [abs(d) for d in diffs if d is not None]
+
+    if not clean:
+        return {
+            "mae": 0.0,
+            "rmse": 0.0,
+            "max_diff": 0.0,
+            "diffs": diffs,
+        }
+
+    mae = sum(clean) / len(clean)
+    rmse = (sum(d * d for d in clean) / len(clean)) ** 0.5
+    max_diff = max(clean)
+
+    return {
+        "mae": mae,
+        "rmse": rmse,
+        "max_diff": max_diff,
+        "diffs": diffs,
+    }
+
+def is_fallback_rt(aaps_rt: dict) -> bool:
+    if not aaps_rt:
+        return True
+
+    # 1. predBGs отсутствуют полностью → fallback
+    preds = aaps_rt.get("predBGs")
+    if preds is None:
+        return True
+
+    # 2. Если ВСЕ ветки отсутствуют → fallback
+    if not any(preds.get(k) for k in ("IOB", "COB", "UAM")):
+        return True
+
+    # 3. minPredBG/minGuardBG могут отсутствовать — это НЕ fallback
+    #    поэтому не проверяем
+
+    # 4. rate/duration могут быть None — это НЕ fallback
+    #    поэтому не проверяем
+
+    # 5. consoleError — fallback только если есть явные аварии
+    errors = aaps_rt.get("consoleError") or []
+    for line in errors:
+        if "Parabolic fit" in line or "extrapolates" in line:
+            return True
+
+    return False
+
 
 def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
+    # Тестовый режим — когда return_stats=True
+    test_mode = return_stats
+
     # paths=None → data/logs
     if not paths:
         default_dir = Path("data/logs")
@@ -143,7 +215,25 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
     all_parsed: List[Any] = []
     for p in paths:
         parsed = load_logs(p)
+        source_log_path = str(p)
         logger.info(f"Загружено {len(parsed)} объектов из {p}")
+
+        # ← ДОБАВЛЯЕМ ПУТЬ К ЛОГУ В КАЖДЫЙ ОБЪЕКТ
+        for obj in parsed:
+            if isinstance(obj, dict):
+                obj["_log_path"] = source_log_path
+
+                # Добавляем idx из имени файла clean-блока
+                if test_mode:
+                    fname = os.path.basename(source_log_path)
+                    if fname.startswith("block_") and fname.endswith(".json"):
+                        try:
+                            external_idx = int(fname[6:-5])
+                            obj["idx"] = external_idx
+                        except Exception:
+                            pass
+
+
         all_parsed.extend(parsed)
 
     # собираем AutoISF-блоки
@@ -154,10 +244,11 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
     while i < n:
         obj = all_parsed[i]
         if isinstance(obj, dict) and obj.get("__type__") == "GlucoseStatusAutoIsf":
-            block_objs = [obj]
+            block_objs = [obj]  # _log_path уже есть
             j = i + 1
             while j < n:
-                block_objs.append(all_parsed[j])
+                next_obj = all_parsed[j]
+                block_objs.append(next_obj)  # _log_path уже есть
                 if (
                     isinstance(all_parsed[j], dict)
                     and all_parsed[j].get("__type__") == "RT"
@@ -174,7 +265,8 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
         raise ValueError("Нет AutoISF-блоков.")
 
     total = len(blocks)
-    print(f"Обработка {total} AutoISF блоков...")
+    if not return_stats:
+        print(f"Обработка {total} AutoISF блоков...")
 
     mismatch_stats = {
         "eventualBG": 0,
@@ -193,9 +285,26 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
     rows: List[dict] = []
     ns_results: List[SimpleNamespace] = []
 
-    for idx, block_objs in enumerate(blocks, start=1):
+    # Если return_stats=True → тестовый режим
+    test_mode = return_stats
+
+    for local_idx, block_objs in enumerate(blocks, start=1):
+        idx: int = local_idx
+
+        if test_mode:
+            raw_idx = block_objs[0].get("idx")
+            if isinstance(raw_idx, int):
+                idx = cast(int, raw_idx)
+
         aaps_res = _extract_aaps_result_from_objs(block_objs) or {}
-        ts = aaps_res.get("timestamp") or block_objs[0].get("date") or 0
+        fallback = is_fallback_rt(aaps_res)
+        ts_raw = aaps_res.get("timestamp")
+        if not isinstance(ts_raw, int):
+            ts_raw = block_objs[0].get("date")
+            if not isinstance(ts_raw, int):
+                ts_raw = 0
+        ts: int = ts_raw
+
         tz = _detect_timezone(ts)
 
         try:
@@ -205,12 +314,28 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
             _dump_error_block(idx, block_objs, exc, stage="build_inputs")
             continue
 
-        try:
-            variable_sens, pred, dosing = run_autoisf_pipeline(inputs)
-        except Exception as exc:
-            logger.error(f"[{idx}] Ошибка pipeline: {exc}")
-            _dump_error_block(idx, block_objs, exc, stage="pipeline")
-            continue
+        if test_mode:
+            # Тестовый режим — НЕ запускаем pipeline
+            variable_sens = aaps_res.get("variable_sens")
+            pred = SimpleNamespace(
+                eventual_bg=aaps_res.get("eventualBG"),
+                min_pred_bg=aaps_res.get("minPredBG"),
+                min_guard_bg=aaps_res.get("minGuardBG"),
+                predBGs=(aaps_res.get("predBGs") or {}).get("UAM", []),
+            )
+            dosing = SimpleNamespace(
+                insulinReq=aaps_res.get("insulinReq"),
+                rate=aaps_res.get("rate"),
+                duration=aaps_res.get("duration"),
+                smb=aaps_res.get("smb"),
+            )
+        else:
+            try:
+                variable_sens, pred, dosing = run_autoisf_pipeline(inputs)
+            except Exception as exc:
+                logger.error(f"[{idx}] Ошибка pipeline: {exc}")
+                _dump_error_block(idx, block_objs, exc, stage="pipeline")
+                continue
 
         # AAPS значения
         aaps_eventual = aaps_res.get("eventualBG")
@@ -231,6 +356,27 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
         py_rate = getattr(dosing, "rate", None)
         py_duration = getattr(dosing, "duration", None)
         py_smb = getattr(dosing, "smb", None)
+
+        # predicted BG arrays
+        # AAPS predBGs — это словарь, берём только UAM
+        predBGs_dict = aaps_res.get("predBGs") or {}
+        aaps_pred_list = predBGs_dict.get("UAM") or []
+
+        # Python predBGs — гарантированно список
+        py_pred_raw = getattr(pred, "predBGs", [])
+
+        # если predBGs — словарь (старый формат), берём UAM
+        if isinstance(py_pred_raw, dict):
+            py_pred_list = py_pred_raw.get("UAM", []) or []
+        # если None → пустой список
+        elif py_pred_raw is None:
+            py_pred_list = []
+        # если список → оставляем
+        else:
+            py_pred_list = py_pred_raw
+
+        # compute metrics
+        pred_metrics = compute_metrics(aaps_pred_list, py_pred_list)
 
         mismatch = False
 
@@ -275,7 +421,7 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
             mismatch = True
 
         row = {
-            "idx": idx,
+            "idx": int(idx),
             "timestamp": ts,
             "eventualBG_aaps": aaps_eventual,
             "eventualBG_py": py_eventual,
@@ -293,20 +439,44 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
             "duration_py": py_duration,
             "smb_aaps": aaps_smb,
             "smb_py": py_smb,
+            "predBGs_mae": pred_metrics["mae"],
+            "predBGs_rmse": pred_metrics["rmse"],
+            "predBGs_max_diff": pred_metrics["max_diff"],
+            "fallback": fallback,
         }
+        row["log_path"] = block_objs[0].get("_log_path")
+        row["predBGs_aaps"] = aaps_pred_list
+        row["predBGs_py"] = py_pred_list
         rows.append(row)
+
 
         ns_results.append(SimpleNamespace(**row))
 
-        if mismatch:
+        if fallback:
+            # Пропускаем mismatch — AAPS был в аварийном режиме
+            if not test_mode:
+                _progress_bar(idx, total, start_time)
+
+            continue
+
+        if mismatch and not test_mode:
             try:
                 out = cache_dir / f"mismatch_block_{idx}.json"
+
                 with out.open("w", encoding="utf-8") as f:
                     json.dump(
                         {
                             "index": idx,
                             "timestamp": ts,
                             "row": _serialize(row),
+                            "predBGs_aaps": aaps_pred_list,
+                            "predBGs_py": py_pred_list,
+                            "predBGs_diff": pred_metrics["diffs"],
+                            "predBGs_metrics": {
+                                "mae": pred_metrics["mae"],
+                                "rmse": pred_metrics["rmse"],
+                                "max_diff": pred_metrics["max_diff"],
+                            },
                             "inputs": {
                                 "glucose_status": _serialize(inputs.glucose_status),
                                 "current_temp": _serialize(inputs.current_temp),
@@ -340,10 +510,39 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
             except Exception as e:
                 logger.error(f"Не удалось сохранить mismatch-блок: {e}")
 
-        _progress_bar(idx, total, start_time)
+        if not test_mode:
+            _progress_bar(idx, total, start_time)
+
 
     print()
     logger.info(f"Обработка завершена. Блоков: {total}")
+
+    if not test_mode:
+        # --- SAVE SUMMARY REPORT ---
+        report_dir = Path("reports/compare")
+        report_dir.mkdir(parents=True, exist_ok=True)
+
+        # CSV
+        csv_path = report_dir / "summary.csv"
+        with csv_path.open("w", encoding="utf-8") as f:
+            header = list(rows[0].keys())
+            f.write(",".join(header) + "\n")
+            for r in rows:
+                f.write(",".join(str(r.get(h, "")) for h in header) + "\n")
+
+        # JSON
+        json_path = report_dir / "summary.json"
+        with json_path.open("w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "total_blocks": total,
+                    "mismatch_stats": mismatch_stats,
+                    "rows": rows,
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
 
     if return_stats:
         return {
@@ -357,18 +556,34 @@ def compare_logs(paths=None, fast: bool = False, return_stats: bool = False):
 
 if __name__ == "__main__":
     import argparse
+    from pathlib import Path
 
     parser = argparse.ArgumentParser(
         description="Compare AAPS logs with Python AutoISF emulator (pipeline)"
     )
+
     parser.add_argument(
-        "--log", type=str, help="Path to AAPS log file or directory", default=None
+        "--log",
+        type=str,
+        help="Path to AAPS log file or directory",
+        default=None,
     )
+
     parser.add_argument(
-        "--fast", action="store_true", help="Fast mode (reserved, not used yet)"
+        "--fast",
+        action="store_true",
+        help="Fast mode (skip heavy checks)",
     )
+
+    parser.add_argument(
+        "--report",
+        action="store_true",
+        help="Return detailed stats instead of printing summary",
+    )
+
     args = parser.parse_args()
 
+    # Определяем пути
     if args.log:
         paths = [args.log]
     else:
@@ -384,4 +599,4 @@ if __name__ == "__main__":
             "Нет логов для сравнения. Укажите путь через --log или положите JSON/ZIP/LOG в data/logs/"
         )
     else:
-        compare_logs(paths, fast=args.fast)
+        compare_logs(paths, fast=args.fast, return_stats=args.report)
