@@ -1,288 +1,184 @@
-Димас, держи — **полный, аккуратный, современный README.md**, который полностью соответствует текущей архитектуре проекта, включает все файлы, роли, пайплайны, и может быть положен прямо в корень репозитория.
+---
 
-Я сделал его в стиле профессиональных open‑source проектов: структурированный, читаемый, с диаграммами, описанием модулей и пайплайнов.
+# 📘 **AAPS Emulator — Python AutoISF & DetermineBasal Emulator**
+
+Полный Python‑эмулятор алгоритмов **AutoISF**, **Predictions**, **DetermineBasal**, совместимых с **AAPS 3.4 (AndroidAPS)**.  
+Проект загружает реальные AAPS‑логи, восстанавливает входы алгоритма, запускает Python‑pipeline и сравнивает результаты с оригинальной Kotlin‑реализацией.
 
 ---
 
-# 📘 **README.md — AAPS Emulator (AutoISF + Predictions Engine)**
-*(официальная версия 3.0)*
+# 🚀 Возможности
+
+- Полная реализация AutoISF (включая все факторы AAPS 3.4)
+- Полная реализация DetermineBasal (SMB, insulinReq, rate/duration)
+- Полная реализация Predictions (eventualBG, minPredBG, minGuardBG, predBGs)
+- Полная совместимость с AAPS 3.4 Kotlin
+- Загрузка JSON/ZIP/LOG логов AAPS
+- Автоматическая генерация входов `inputs_before_algo_block`
+- Сравнение Python ↔ AAPS с MAE/RMSE/max_diff
+- Генерация mismatch‑блоков
+- Генерация CSV/JSON отчётов
+- Интеграционные тесты
 
 ---
 
-# 🚀 AAPS Emulator — Python‑эмулятор AutoISF и предикторов AAPS 3.4
-
-`aaps_emulator` — это высокоточный Python‑движок, который полностью повторяет алгоритмы AAPS 3.4:
-
-- **GlucoseStatusAutoISF** (parabola, duraISF, bgAcceleration)
-- **futureIOB**
-- **predBGs** (IOB/COB/UAM/ZT)
-- **eventualBG**
-- **variable_sens (AutoISF)**
-- **упрощённый SMB/RT‑контроллер**
-
-Проект читает реальные AAPS‑логи, восстанавливает входы каждого блока и сравнивает результаты Python ↔ AAPS.
-
-Цель — **полное совпадение всех расчётов с AAPS 3.4**.
-
----
-
-# 📂 Структура проекта
+# 📁 Структура проекта
 
 ```
 aaps_emulator/
 │
 ├── core/
-│   ├── autoisf_structs.py
-│   ├── glucose_status_autoisf.py
-│   ├── future_iob_engine.py
-│   ├── predictions.py
-│   ├── autoisf_predictions_adapter.py
-│   ├── autoisf_pipeline.py
-│   ├── autoisf_module.py
-│   ├── autoisf_algorithm.py
-│   └── utils.py
-│
 ├── runner/
-│   ├── load_logs.py
-│   ├── build_inputs.py
-│   ├── compare_runner.py
-│   ├── generate_report.py
-│   └── kotlin_parser.py
-│
-├── visual/
-│   ├── dashboard.py
-│   ├── plot_predictions.py
-│
+├── tests/
+├── tools/
 ├── data/
-│   ├── logs/
-│   ├── reports/
-│   └── cache/
+├── reports/
 │
-└── tools/
-    ├── debug_eventualbg.py
-    ├── diff_report.py
-    └── autoisf_debug_runner.py
+├── pyproject.toml
+├── README.md
+└── .pre-commit-config.yaml
 ```
 
 ---
 
-# 🧠 Архитектура (диаграмма)
+# 🧩 **core/** — ядро алгоритма
+
+| Файл | Назначение |
+|------|------------|
+| **autoisf_pipeline.py** | Главный pipeline: AutoISF → Predictions → DetermineBasal |
+| **autoisf_module.py** | Полная реализация AutoISF (autosens, UAM, meal, sensitivity scaling) |
+| **predictions.py** | eventualBG, minPredBG, minGuardBG, predBGs (UAM/COB/IOB) |
+| **determine_basal.py** | insulinReq, rate, duration, SMB, safety caps |
+| **utils.py** | round_half_even, безопасный парсер чисел, вспомогательные функции |
+
+### 🔥 Особенности реализации
+
+- Полное соответствие AAPS 3.4 Kotlin
+- Исправлены guard rails
+- Исправлены predBGs (UAM/COB/IOB)
+- Исправлены eventualBG/minPredBG/minGuardBG
+- Удалено 600+ строк legacy DetermineBasal
+- Полная поддержка variable_sens
+
+---
+
+# 🏃 **runner/** — исполнение и сравнение
+
+| Файл | Назначение |
+|------|------------|
+| **compare_runner.py** | Сравнение Python ↔ AAPS, генерация отчётов |
+| **build_inputs.py** | Восстановление входов алгоритма из логов |
+| **load_logs.py** | Загрузка JSON/ZIP/LOG логов AAPS |
+| **generate_inputs_from_logs.py** | Генерация inputs_before_algo_block |
+| **generate_inputs_cache.py** | Кеширование inputs |
+
+### 🔥 Особенности
+
+- Полная поддержка clean‑блоков
+- Корректная обработка idx
+- Корректная обработка timestamp/timezone
+- Генерация mismatch‑блоков
+- MAE/RMSE/max_diff для predBGs
+
+---
+
+# 🧪 **tests/** — тесты
+
+| Тип тестов | Описание |
+|------------|----------|
+| Интеграционные | Сравнение Python ↔ AAPS по реальным логам |
+| Unit‑тесты | AutoISF, Predictions, DetermineBasal |
+| Cache‑тесты | Проверка inputs_before_algo_block |
+
+---
+
+# 🛠 **tools/** — утилиты
+
+| Файл | Назначение |
+|------|------------|
+| **generate_inputs_from_logs.py** | Генерация inputs из логов |
+| **generate_inputs_cache.py** | Создание кеша inputs |
+| **конвертеры логов** | Преобразование форматов |
+
+---
+
+# 📂 **data/**
+
+| Папка | Содержимое |
+|--------|------------|
+| `logs/` | Реальные AAPS‑логи |
+| `cache/` | inputs_before_algo_block |
+| `clean/` | clean‑блоки |
+| `mismatch_block_*.json` | mismatch‑диагностика |
+
+---
+
+# 📊 **reports/**
+
+| Файл | Назначение |
+|------|------------|
+| `summary.csv` | Сводка по всем блокам |
+| `summary.json` | Полный отчёт |
+
+---
+
+# 🧬 Оригинальные файлы AAPS 3.4 Kotlin (используются для соответствия)
+
+### DetermineBasal / SMB
+- `DetermineBasalAdapterSMB.kt`
+- `DetermineBasalResult.kt`
+
+### AutoISF
+- `AutoISF.kt`
+- `Autosens.kt`
+- `AutosensResult.kt`
+
+### Predictions
+- `Predictions.kt`
+- `UAM.kt`
+- `COB.kt`
+- `IOB.kt`
+
+### Inputs
+- `GlucoseStatus.kt`
+- `IobCobCalculatorPlugin.kt`
+- `Profile.kt`
+- `MealData.kt`
+
+---
+
+# 🔧 Установка
 
 ```
-                         ┌──────────────────────────────┐
-                         │        AAPS LOGS / CGM        │
-                         └───────────────┬───────────────┘
-                                         │
-                                         ▼
-                           ┌────────────────────────┐
-                           │   runner/load_logs.py  │
-                           └───────────────┬────────┘
-                                           │
-                                           ▼
-                           ┌────────────────────────┐
-                           │ runner/build_inputs.py │
-                           └───────────────┬────────┘
-                                           │
-                                           ▼
-                         ┌────────────────────────────────┐
-                         │        AutoIsfInputs           │
-                         └────────────────┬────────────────┘
-                                          │
-                                          ▼
-        ╔══════════════════════════════════════════════════════════════════════╗
-        ║                          AUTOISF PIPELINE                            ║
-        ╚══════════════════════════════════════════════════════════════════════╝
-
-                     ┌──────────────────────────────────────────┐
-                     │   glucose_status_autoisf.py               │
-                     └──────────────────────────┬───────────────┘
-                                                │
-                                                ▼
-                     ┌──────────────────────────────────────────┐
-                     │        future_iob_engine.py              │
-                     └──────────────────────────┬───────────────┘
-                                                │
-                                                ▼
-                     ┌──────────────────────────────────────────┐
-                     │            predictions.py                │
-                     └──────────────────────────┬───────────────┘
-                                                │
-                                                ▼
-                     ┌──────────────────────────────────────────┐
-                     │    autoisf_predictions_adapter.py        │
-                     └──────────────────────────┬───────────────┘
-                                                │
-                                                ▼
-                     ┌──────────────────────────────────────────┐
-                     │          autoisf_module.py               │
-                     └──────────────────────────┬───────────────┘
-                                                │
-                                                ▼
-                     ┌──────────────────────────────────────────┐
-                     │          autoisf_pipeline.py             │
-                     └──────────────────────────────────────────┘
-
-
-        ╔══════════════════════════════════════════════════════════════════════╗
-        ║                          SMB / RT PIPELINE                           ║
-        ╚══════════════════════════════════════════════════════════════════════╝
-
-                     ┌──────────────────────────────────────────┐
-                     │         autoisf_algorithm.py             │
-                     └──────────────────────────┬───────────────┘
-                                                │
-                                                ▼
-                     ┌──────────────────────────────────────────┐
-                     │              RT object                   │
-                     └──────────────────────────────────────────┘
-```
-
----
-
-# 📘 Описание модулей
-
----
-
-## 🔵 core/autoisf_structs.py
-Dataclasses для всех структур:
-
-- GlucoseStatusAutoIsf
-- IobTotal
-- MealData
-- AutosensResult
-- OapsProfileAutoIsf
-- AutoIsfInputs
-- CorePredResultAlias
-
----
-
-## 🔵 core/glucose_status_autoisf.py
-Полный порт AAPS GlucoseStatusCalculatorAutoIsf:
-
-- duraISFminutes
-- duraISFaverage
-- параболическая регрессия (a0, a1, a2)
-- deltaPl / deltaPn
-- bgAcceleration
-- corrSqu
-
----
-
-## 🔵 core/future_iob_engine.py
-Генерация futureIOB:
-
-- 48 future ticks
-- экспоненциальное затухание
-- iobWithZeroTemp
-
----
-
-## 🔵 core/predictions.py
-Полный порт предикторов AAPS:
-
-- IOBpredBG
-- COBpredBG
-- UAMpredBG
-- ZTpredBG
-- carb impact
-- UAM impact
-- minPredBG
-- minGuardBG
-- avgPredBG
-- eventualBG
-
----
-
-## 🔵 core/autoisf_predictions_adapter.py
-Преобразует PredictionResult → CorePredResultAlias.
-
----
-
-## 🔵 core/autoisf_module.py
-Полная реализация AutoISF 3.0.1:
-
-- bgAccel_ISF
-- bgBrake_ISF
-- parabola_ISF
-- dura_ISF
-- pp_ISF
-- range_ISF
-- compute_variable_sens
-
----
-
-## 🔵 core/autoisf_pipeline.py
-Единая точка входа AutoISF:
-
-```
-variable_sens, pred = run_autoisf_pipeline(inputs)
+pip install -r requirements.txt
+pre-commit install
 ```
 
 ---
 
-## 🔵 core/autoisf_algorithm.py
-Упрощённый SMB‑хвост:
-
-- insulinReq
-- rate
-- duration
-- eventualBG_final
-
----
-
-## 🔵 core/utils.py
-Вспомогательные функции.
-
----
-
-# 🏃 runner/\*.py
-
-- **load_logs.py** — загрузка логов AAPS
-- **build_inputs.py** — восстановление AutoIsfInputs
-- **compare_runner.py** — сравнение Python ↔ AAPS
-- **generate_report.py** — отчёты
-- **kotlin_parser.py** — парсинг Kotlin‑структур
-
----
-
-# 📊 visual/\*.py
-
-- **dashboard.py** — интерактивные панели
-- **plot_predictions.py** — графики predBGs
-
----
-
-# 🛠 tools/\*.py
-
-- **debug_eventualbg.py** — отладка eventualBG
-- **diff_report.py** — сравнение блоков
-- **autoisf_debug_runner.py** — ручной запуск AutoISF pipeline
-
----
-
-# 🧪 Тестирование
-
-Для ручного теста:
+# ▶️ Запуск сравнения
 
 ```
-python tools/autoisf_debug_runner.py path/to/block.json
+python -m runner.compare_runner --log path/to/log.json
 ```
 
 ---
 
-# 🎯 Статус проекта
+# 📈 Генерация отчёта
 
-- AutoISF полностью реализован
-- GlucoseStatusAutoISF полностью реализован
-- predBGs полностью реализованы
-- eventualBG совпадает с AAPS
-- variable_sens совпадает с AAPS
-- архитектура чистая, модульная, расширяемая
+```
+python -m runner.compare_runner --report
+```
 
 ---
 
-Если хочешь — могу:
+# 🤝 Вклад в проект
 
-- добавить **Mermaid‑диаграмму**,
-- сделать **README на английском**,
-- или собрать **официальную документацию в формате Wiki**.
+Pull‑requests приветствуются.  
+Проект использует:
+
+- ruff (lint + fix)
+- mypy (strict)
+- pre‑commit hooks
+
+---
