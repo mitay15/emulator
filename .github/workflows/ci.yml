@@ -27,19 +27,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install ruff autoflake mypy pytest bandit coverage pytest-cov
+          pip install ruff mypy pytest bandit coverage pytest-cov
 
       - name: Install project
         run: pip install -e .
 
       # -----------------------------
-      # Linting
+      # Linting (ruff = autoflake + isort + flake8 + black)
       # -----------------------------
       - name: Ruff (lint + fix)
         run: ruff check . --fix
-
-      - name: Autoflake
-        run: autoflake --in-place --remove-all-unused-imports --recursive .
 
       # -----------------------------
       # Type checking (uses mypy.ini)
