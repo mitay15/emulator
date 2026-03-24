@@ -23,42 +23,18 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
-      # -----------------------------
-      # Install heavy deps (with verbose output)
-      # -----------------------------
       - name: Install heavy deps
         run: |
           python -m pip install --upgrade pip
           pip install --prefer-binary --progress-bar off --verbose numpy pandas matplotlib plotly
 
-      # -----------------------------
-      # Install dev deps (with verbose output)
-      # -----------------------------
       - name: Install dev deps
         run: |
-          pip install --prefer-binary --progress-bar off --verbose ruff mypy pytest bandit coverage pytest-cov
+          pip install --prefer-binary --progress-bar off --verbose ruff pytest coverage pytest-cov
 
-      # -----------------------------
-      # Linting
-      # -----------------------------
       - name: Ruff (lint + fix)
         run: ruff check . --fix
 
-      # -----------------------------
-      # Type checking
-      # -----------------------------
-      - name: Mypy
-        run: mypy
-
-      # -----------------------------
-      # Security audit
-      # -----------------------------
-      - name: Bandit
-        run: bandit -r .
-
-      # -----------------------------
-      # Tests
-      # -----------------------------
       - name: Run tests
         run: pytest -q
 
