@@ -32,22 +32,30 @@ jobs:
       - name: Install project
         run: pip install -e .
 
-      # ---- Linting ----
+      # -----------------------------
+      # Linting
+      # -----------------------------
       - name: Ruff (lint + fix)
         run: ruff check . --fix
 
       - name: Autoflake
         run: autoflake --in-place --remove-all-unused-imports --recursive .
 
-      # ---- Type checking ----
+      # -----------------------------
+      # Type checking (uses mypy.ini)
+      # -----------------------------
       - name: Mypy
-        run: mypy .
+        run: mypy
 
-      # ---- Security ----
+      # -----------------------------
+      # Security audit
+      # -----------------------------
       - name: Bandit
         run: bandit -r .
 
-      # ---- Tests ----
+      # -----------------------------
+      # Tests
+      # -----------------------------
       - name: Run tests
         run: pytest -q
 
