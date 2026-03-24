@@ -37,13 +37,19 @@ data/reports/
 project_dump/
 debug_bundle_*/
 
-# Keep the folder structure but ignore contents
+# Keep folder structure but ignore contents
 data/cache/*
 !data/cache/.gitkeep
+
 data/logs/*
 !data/logs/.gitkeep
+
 data/reports/*
 !data/reports/.gitkeep
 
 # --- Tools output ---
 tree.txt
+
+# --- OS-specific ---
+.DS_Store
+Thumbs.db

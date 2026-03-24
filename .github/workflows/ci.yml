@@ -24,7 +24,7 @@ jobs:
           cache: "pip"
 
       # -----------------------------
-      # Install heavy dependencies
+      # Install heavy deps (with verbose output)
       # -----------------------------
       - name: Install heavy deps
         run: |
@@ -32,7 +32,7 @@ jobs:
           pip install --prefer-binary --progress-bar off --verbose numpy pandas matplotlib plotly
 
       # -----------------------------
-      # Install dev dependencies
+      # Install dev deps (with verbose output)
       # -----------------------------
       - name: Install dev deps
         run: |
