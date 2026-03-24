@@ -30,7 +30,7 @@ jobs:
           pip install ruff mypy pytest bandit coverage pytest-cov
 
       - name: Install project
-        run: pip install -e .
+        run: pip install .
 
       # -----------------------------
       # Linting
