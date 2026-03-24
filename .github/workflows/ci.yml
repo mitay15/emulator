@@ -29,6 +29,9 @@ jobs:
           pip install -r requirements.txt
           pip install pre-commit ruff isort black mypy pytest bandit coverage pytest-cov
 
+      - name: Install project
+        run: pip install -e .
+
       - name: Run pre-commit hooks
         run: pre-commit run --all-files
 
