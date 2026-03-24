@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# tools/generate_inputs_from_logs.py
 # aaps_emulator/tools/generate_inputs_from_logs.py
 import argparse
 import json
@@ -7,7 +7,7 @@ from pathlib import Path
 from runner.build_inputs import build_inputs_from_block
 from runner.load_logs import load_logs
 
-OUT_DIR = Path("aaps_emulator/data/cache")
+OUT_DIR = Path("data/cache")
 
 
 def save_inputs_from_block(block, out_dir: Path):
@@ -68,9 +68,17 @@ def save_inputs_from_block(block, out_dir: Path):
                 else None
             ),
             "rt": getattr(inputs_obj, "rt", None) or None,
+            "algorithm": getattr(inputs_obj, "rt", {}).get("algorithm"),
         },
         "block_index": ts,
     }
+
+    algo = (
+        inputs_dump["inputs"].get("algorithm")
+        or inputs_dump["inputs"].get("rt", {}).get("algorithm")
+    )
+    inputs_dump["algorithm"] = algo
+
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
         json.dumps(inputs_dump, ensure_ascii=False, indent=2), encoding="utf-8"

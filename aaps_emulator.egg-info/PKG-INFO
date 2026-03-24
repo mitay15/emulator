@@ -1,8 +1,0 @@
-Metadata-Version: 2.4
-Name: aaps_emulator
-Version: 3.0.0
-Summary: Python emulator of AAPS AutoISF and predictions engine
-Requires-Python: >=3.10
-Requires-Dist: numpy
-Requires-Dist: matplotlib
-Requires-Dist: pytest

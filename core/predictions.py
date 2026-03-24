@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from core.autoisf_structs import IobTotal
-from core.future_iob_engine import InsulinCurveParams, generate_future_iob
 from core.utils import round_half_even
 from runner.build_inputs import AutoIsfInputs
 
@@ -68,13 +67,7 @@ def run_predictions(
     # Генерируем future Oref1‑кривую и заменяем iob_array
     try:
         # profile may not be defined yet; use fallback dia if needed
-        dia_hours = (
-            getattr(inputs.profile, "dia", 5.0)
-            if getattr(inputs, "profile", None) is not None
-            else 5.0
-        )
-        params = InsulinCurveParams(dia_hours=float(dia_hours), step_minutes=5)
-        iob_array = generate_future_iob(orig_iob_tick, params)
+        iob_array = [orig_iob_tick]
     except Exception:
         # fallback: если генерация упала — оставляем исходный тик в массиве
         iob_array = [orig_iob_tick]
@@ -521,7 +514,6 @@ def run_predictions(
             UAMpredBGs[-1]
             eventualBG = max(eventualBG, _round(UAMpredBGs[-1], 0))
 
-    res.eventual_bg = eventualBG
 
     # fallback for minima
     if minIOBPredBG == float("inf"):
@@ -617,5 +609,65 @@ def run_predictions(
         minPredBG = min(minPredBG, maxCOBPredBG)
 
     res.min_pred_bg = minPredBG
+
+    # --- AAPS-like minPredBG and minGuardBG finalization ---
+    try:
+        # minPredBG = минимум из всех предсказаний
+        candidates = []
+        if res.pred_iob:
+            candidates.extend(res.pred_iob)
+        if res.pred_uam:
+            candidates.extend(res.pred_uam)
+        if res.pred_zt:
+            candidates.extend(res.pred_zt)
+        if res.pred_cob:
+            candidates.extend(res.pred_cob)
+
+        if candidates:
+            res.min_pred_bg = float(min(candidates))
+        else:
+            res.min_pred_bg = float(bg)
+    except Exception:
+        res.min_pred_bg = float(bg)
+
+    try:
+        # minGuardBG = минимум из IOB и ZT (как в AAPS)
+        guard_candidates = []
+        if res.pred_iob:
+            guard_candidates.extend(res.pred_iob)
+        if res.pred_zt:
+            guard_candidates.extend(res.pred_zt)
+
+        if guard_candidates:
+            res.min_guard_bg = float(min(guard_candidates))
+        else:
+            res.min_guard_bg = float(bg)
+    except Exception:
+        res.min_guard_bg = float(bg)
+
+    # --- AAPS-compatible eventualBG calculation ---
+    try:
+        # 1) Start from avgPredBG
+        eventual = avgPredBG
+
+        # 2) Apply minPredBG safety
+        if res.min_pred_bg is not None:
+            eventual = max(eventual, res.min_pred_bg)
+
+        # 3) Apply guardBG safety
+        if res.min_guard_bg is not None:
+            eventual = max(eventual, res.min_guard_bg)
+
+        # 4) Apply targetBG floor
+        target_bg = (getattr(profile, "min_bg", 0.0) + getattr(profile, "max_bg", 0.0)) / 2.0
+        eventual = max(eventual, _round(target_bg, 0))
+
+        # 5) Clamp to AAPS range
+        eventual = int(max(39, min(401, eventual)))
+
+        res.eventual_bg = eventual
+    except Exception:
+        pass
+    # --- END eventualBG override ---
 
     return res

@@ -140,6 +140,22 @@ def determine_basal_autoisf(
 
     res = DosingResult()
 
+    # --- AAPS 3.4: extract key prediction values ---
+    eventualBG = debug.get("eventualBG")
+    minPredBG = debug.get("minPredBG")
+    minGuardBG = debug.get("minGuardBG")
+
+    # safe max_iob fallback
+    max_iob = getattr(profile, "max_iob", None)
+    try:
+        max_iob = float(max_iob) if max_iob is not None else 0.0
+    except Exception:
+        max_iob = 0.0
+
+    enableSMB = bool(getattr(profile, "enableSMB", False))
+    smb_ratio = float(getattr(profile, "smb_delivery_ratio", 1.0) or 1.0)
+    iob_threshold_percent = float(getattr(profile, "iob_threshold_percent", 30) or 30)
+
     if glucose_status is None or profile is None or iob_data is None:
         return res
 
@@ -329,12 +345,26 @@ def determine_basal_autoisf(
         if sens != 0
         else 0.0
     )
-    max_iob = getattr(profile, "max_iob", 0.0)
+    max_iob = getattr(profile, "max_iob", None)
+    try:
+        max_iob = float(max_iob) if max_iob is not None else 0.0
+    except Exception:
+        max_iob = 0.0
+
     if insulinReq > max_iob - iob_data.iob:
         insulinReq = max_iob - iob_data.iob
 
+    # AAPS: do not allow negative insulinReq
+    if insulinReq < 0:
+        insulinReq = 0.0
+
+    # AAPS: if insulinReq == 0 and eventualBG >= target_bg → zero temp, not high temp
+    if insulinReq == 0 and eventualBG >= target_bg:
+        return set_temp_basal(0.0, 30, profile, res, currenttemp)
+
     rate = basal + (2 * insulinReq)
 
+    # --- AAPS safety cap: limit by maxSafeBasal ---
     maxSafeBasal = get_max_safe_basal(profile)
     if rate > maxSafeBasal:
         rate = maxSafeBasal
@@ -362,12 +392,112 @@ def determine_basal_autoisf(
         res.duration = int(currenttemp.duration or 0)
         return res
 
-    # SMB / microbolus logic
+    # --- AAPS: compute lastBolusAge and SMBInterval ---
+    lastBolusTime = int(getattr(iob_data, "lastBolusTime", 0) or 0)
+    currentTime = int(currentTime or 0)
+    lastBolusAge = max(0.0, (currentTime - lastBolusTime) / 1000.0)
+    SMBInterval = min(10, max(1, int(getattr(profile, "SMBInterval", 5)))) * 60.0
+
+    # --- AAPS: compute iobTHvirtual (IOB threshold) ---
     iob_threshold_percent = getattr(profile, "iob_threshold_percent", 100)
     iobTHtolerance = 130.0
-    iobTHvirtual = (iob_threshold_percent * iobTHtolerance / 10000.0) * getattr(
-        profile, "max_iob", 0.0
-    )
+    iobTHvirtual = (
+        iob_threshold_percent * iobTHtolerance / 10000.0
+    ) * getattr(profile, "max_iob", 0.0)
+
+    # --- AAPS 3.4 SMB LOGIC ---
+    # Disable SMB if max_iob == 0
+    if getattr(profile, "max_iob", 0.0) <= 0:
+        enableSMB = False
+
+    # Disable SMB if IOB above threshold
+    if iob_data.iob > iobTHvirtual:
+        enableSMB = False
+
+    # Disable SMB if bolus too recent
+    if lastBolusAge < SMBInterval:
+        enableSMB = False
+
+    # Disable SMB if BG rising too fast
+    if maxDelta > 0.20 * bg:
+        enableSMB = False
+
+    # SMB allowed?
+    if microBolusAllowed and enableSMB and bg > threshold:
+        # Meal insulin requirement
+        mealInsulinReq = (
+            round_val(
+                getattr(meal, "mealCOB", 0.0)
+                / (getattr(profile, "carb_ratio", 1.0) or 1.0),
+                3,
+            )
+            if getattr(profile, "carb_ratio", None)
+            else 0.0
+        )
+
+        # SMB max range
+        smb_max_range = getattr(profile, "smb_delivery_ratio", 0.5)
+
+        # UAM-sensitive SMB
+        if iob_data.iob > mealInsulinReq and iob_data.iob > 0:
+            maxBolus = round_val(
+                smb_max_range
+                * profile.current_basal
+                * getattr(
+                    profile,
+                    "maxUAMSMBBasalMinutes",
+                    getattr(profile, "maxSMBBasalMinutes", 30),
+                )
+                / 60.0,
+                1,
+            )
+        else:
+            maxBolus = round_val(
+                smb_max_range
+                * profile.current_basal
+                * getattr(profile, "maxSMBBasalMinutes", 30)
+                / 60.0,
+                1,
+            )
+
+        # Round to bolus increment
+        bolus_increment = getattr(profile, "bolus_increment", 0.1) or 0.1
+        roundSMBTo = int(1.0 / bolus_increment)
+        if roundSMBTo <= 0:
+            roundSMBTo = 10
+
+        # Compute microBolus
+        microBolus = min(insulinReq / 2.0, maxBolus)
+
+        # Apply SMB ratio (AutoISF)
+        smb_ratio = getattr(profile, "smb_delivery_ratio", 0.5)
+        microBolus = min(insulinReq * smb_ratio, maxBolus)
+
+        # Apply IOB threshold
+        if microBolus > iobTHvirtual - iob_data.iob:
+            microBolus = max(0.0, iobTHvirtual - iob_data.iob)
+
+        # Round to increment
+        microBolus = int(microBolus * roundSMBTo) / float(roundSMBTo)
+
+        # SMBInterval check
+        if lastBolusAge >= SMBInterval - 6.0:
+            if microBolus > 0:
+                res.units = microBolus
+
+        # If SMB delivered, still return temp basal if needed
+        if insulinReq > 0:
+            res.rate = rate
+            res.duration = 30
+            return res
+
+    # --- AAPS: disable SMB if max_iob == 0 ---
+    if getattr(profile, "max_iob", 0.0) <= 0:
+        enableSMB = False
+
+    # --- AAPS: disable SMB if IOB above threshold ---
+    if iob_data.iob > iobTHvirtual:
+        enableSMB = False
 
     if microBolusAllowed and enableSMB and bg > threshold:
         mealInsulinReq = (
@@ -423,6 +553,10 @@ def determine_basal_autoisf(
         lastBolusAge = max(0.0, (currentTime - lastBolusTime) / 1000.0)
         SMBInterval = min(10, max(1, int(getattr(profile, "SMBInterval", 5)))) * 60.0
 
+        # --- AAPS: disable SMB if bolus too recent ---
+        if lastBolusAge < SMBInterval:
+            enableSMB = False
+
         if lastBolusAge > SMBInterval - 6.0:
             if microBolus > 0:
                 res.units = microBolus
@@ -460,8 +594,11 @@ def determine_basal_autoisf(
 
 # wrapper for pipeline
 def run_determine_basal(
-    inputs: AutoIsfInputs, pred: CorePredResultAlias, variable_sens: float
+    inputs: AutoIsfInputs,
+    pred: CorePredResultAlias,
+    variable_sens: float,
 ) -> DosingResult:
+
     rt = inputs.rt or {}
     rt_pred = rt.get("predBGs") or {}
 
@@ -512,7 +649,9 @@ def run_determine_basal(
         "longAvgDelta": longAvgDelta,
     }
 
-    current_time = safe_get(rt, "timestamp", inputs.glucose_status.date)
+    gs_date = getattr(inputs.glucose_status, "date", None)
+    current_time = safe_get(rt, "timestamp", gs_date or 0)
+
     micro_bolus_allowed = safe_get(rt, "microBolusAllowed", False)
 
     gs = inputs.glucose_status
@@ -563,7 +702,7 @@ def run_determine_basal(
         microBolusAllowed=micro_bolus_allowed,
         debug=debug,
     )
-
+    
     # Temporary test adjustment: if insulinReq == 0 and duration > 30, clamp duration to 30
     try:
         if (

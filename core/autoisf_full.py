@@ -159,8 +159,17 @@ def compute_variable_sens(
     # -----------------------------
     # 3. Parabola / Acceleration ISF
     # -----------------------------
-    fit_corr = gs.corrSqu
-    bg_acce = gs.bgAcceleration
+    # corrSqu и bgAcceleration могут быть строками → приводим к float
+    try:
+        fit_corr = float(gs.corrSqu)
+    except Exception:
+        fit_corr = 0.0
+
+    try:
+        bg_acce = float(gs.bgAcceleration)
+    except Exception:
+        bg_acce = 0.0
+
     acce_weight = 1.0
 
     if fit_corr >= 0.9:

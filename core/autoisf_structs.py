@@ -306,22 +306,21 @@ class OapsProfileAutoIsf:
 @dataclass
 class AutosensResult:
     ratio: Optional[float] = None
-    lastChange: Optional[int] = None
+    carb_ratio_adjustment: Optional[float] = None
+    sens_adjustment: Optional[float] = None
     raw: Dict[str, Any] = field(default_factory=dict)
     extras: Dict[str, Any] = field(default_factory=dict)
     __type__: str = "AutosensResult"
 
     def __init__(self, **kwargs):
         object.__setattr__(self, "ratio", None)
-        object.__setattr__(self, "lastChange", None)
-        object.__setattr__(self, "raw", {})
+        object.__setattr__(self, "carb_ratio_adjustment", None)
+        object.__setattr__(self, "sens_adjustment", None)
+        object.__setattr__(self, "raw", dict(kwargs))
         object.__setattr__(self, "extras", {})
         object.__setattr__(self, "__type__", "AutosensResult")
 
-        raw_copy = dict(kwargs)
-        object.__setattr__(self, "raw", raw_copy)
-
-        known = {f.name for f in fields(self)}
+        known = {"ratio", "carb_ratio_adjustment", "sens_adjustment"}
         for k in list(kwargs.keys()):
             if k in known:
                 try:
@@ -330,7 +329,6 @@ class AutosensResult:
                     kwargs.pop(k, None)
 
         object.__setattr__(self, "extras", kwargs or {})
-
 
 @dataclass
 class MealData:
@@ -393,6 +391,7 @@ class DosingResult:
     carbsReqWithin: Optional[int] = None
     smb: Optional[float] = None
     reason: str = ""
+    eventualBG: float | None = None
     raw: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -409,3 +408,6 @@ class CorePredResultAlias:
     pred_zt: List[int] = field(default_factory=list)
     trace: List[Any] = field(default_factory=list)
     raw: Dict[str, Any] = field(default_factory=dict)
+
+# Alias for backward compatibility with tests expecting Profile
+Profile = OapsProfileAutoIsf

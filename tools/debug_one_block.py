@@ -306,7 +306,7 @@ def heuristic_suggestions(dump: Dict[str, Any], trace: Dict[str, Any]) -> List[s
     file_hints = [
         ("predictions", "aaps_emulator/core/predictions.py"),
         ("future_iob_engine", "aaps_emulator/core/future_iob_engine.py"),
-        ("autoisf_module", "aaps_emulator/core/autoisf_module.py"),
+        ("autoisf_full", "aaps_emulator/core/autoisf_full.py"),
         ("determine_basal", "aaps_emulator/core/determine_basal.py"),
         ("utils", "aaps_emulator/core/utils.py"),
     ]

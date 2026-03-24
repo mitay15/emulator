@@ -1,15 +1,50 @@
-*.json
-*.zip
-*.log
-*.csv
-*.html
-venv/
-.env
+# --- Python cache ---
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# --- Virtual environments ---
+venv/
+.env/
+
+# --- IDE / Editor ---
 .vscode/
 .idea/
+
+# --- Test / lint caches ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Build artifacts ---
+*.egg-info/
+dist/
+build/
+
+# --- Logs, dumps, debug output ---
+*.log
+*.txt
+*.zip
+
+# --- Generated data files ---
+*.json
+*.csv
+*.html
+*.png
+
+# --- Project-specific generated folders ---
 data/reports/
 project_dump/
-*.png
-*.txt
+debug_bundle_*/
+
+# Keep the folder structure but ignore contents
+data/cache/*
+!data/cache/.gitkeep
+data/logs/*
+!data/logs/.gitkeep
+data/reports/*
+!data/reports/.gitkeep
+
+# --- Tools output ---
+tree.txt

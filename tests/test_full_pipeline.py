@@ -7,7 +7,7 @@ from core.autoisf_structs import (
     AutosensResult,
     IobTotal,
     MealData,
-    OapsProfileAutoIsf,
+    Profile,
 )
 from core.future_iob_engine import generate_future_iob
 from core.glucose_status_autoisf import (
@@ -31,24 +31,18 @@ def test_full_pipeline_smoke():
     iob_now = IobTotal(iob=1.2, activity=0.03, lastBolusTime=now - 20 * 60 * 1000)
     iob_array = generate_future_iob(iob_now)
 
-    profile = OapsProfileAutoIsf(
+    profile = Profile(
         current_basal=1.0,
         max_basal=3.0,
         max_daily_basal=3.0,
         min_bg=90,
         max_bg=110,
         sens=50,
-        variable_sens=0,
         carb_ratio=10,
         enableUAM=True,
         enable_autoISF=True,
-        bgAccel_ISF_weight=0.01,
-        bgBrake_ISF_weight=0.01,
-        pp_ISF_weight=0.01,
-        dura_ISF_weight=0.01,
-        lower_ISFrange_weight=0.0,
-        higher_ISFrange_weight=0.0,
     )
+
     autosens = AutosensResult(ratio=1.0)
     meal = MealData(mealCOB=20, carbs=40, lastCarbTime=now - 30 * 60 * 1000)
 

@@ -209,6 +209,14 @@ def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
         rt_obj = next(
             (o for o in block if isinstance(o, dict) and o.get("__type__") == "RT"), {}
         )
+        # --- ВСТАВИТЬ ЗДЕСЬ ---
+        algorithm = None
+        if isinstance(rt_obj, dict):
+            algorithm = rt_obj.get("algorithm")
+
+        # Оборачиваем в объект, чтобы compare_runner видел алгоритм
+        algo_marker = {"algorithm": algorithm}
+        # --------------------------------
 
         profile_obj = (
             rt_obj.get("profile") if isinstance(rt_obj, dict) else None
@@ -314,7 +322,7 @@ def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
             autosens=autosens,
             meal=meal,
             rt=rt_obj if isinstance(rt_obj, dict) else {},
-            raw_block=block,
+            raw_block=[algo_marker] + block,
         )
 
     except Exception as exc:
