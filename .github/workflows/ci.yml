@@ -33,7 +33,7 @@ jobs:
         run: pip install -e .
 
       # -----------------------------
-      # Linting (ruff = autoflake + isort + flake8 + black)
+      # Linting
       # -----------------------------
       - name: Ruff (lint + fix)
         run: ruff check . --fix
