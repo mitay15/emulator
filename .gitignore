@@ -24,7 +24,6 @@ build/
 
 # --- Logs, dumps, debug output ---
 *.log
-*.txt
 *.zip
 
 # --- Generated data files ---

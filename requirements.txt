@@ -1,0 +1,6 @@
+matplotlib
+plotly
+pandas
+numpy
+coverage
+pytest-cov
