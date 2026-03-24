@@ -38,7 +38,5 @@ repos:
         pass_filenames: true
         always_run: false
         fail_fast: false
-        # Проверяем только основной код
         files: "^(aaps_emulator/|core/|runner/)"
-        # Игнорируем тесты и инструменты
         exclude: "^(tests/|tools/)"
