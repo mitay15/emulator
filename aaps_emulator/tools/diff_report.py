@@ -1,4 +1,4 @@
-# aaps_emulator/tools/diff_report.py
+# tools/diff_report.py
 from pathlib import Path
 
 import numpy as np

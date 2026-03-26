@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import logging
 
-from core.autoisf_full import compute_variable_sens
-from core.autoisf_structs import (
+from aaps_emulator.core.autoisf_full import compute_variable_sens
+from aaps_emulator.core.autoisf_structs import (
     AutosensResult,
     GlucoseStatusAutoIsf,
     IobTotal,
@@ -13,8 +13,8 @@ from core.autoisf_structs import (
     TempBasal,
     AutoIsfInputs,
 )
-from core.determine_basal import DosingResult, run_determine_basal
-from core.predictions import PredictionsResult, run_predictions
+from aaps_emulator.core.determine_basal import DosingResult, run_determine_basal
+from aaps_emulator.core.predictions import PredictionsResult, run_predictions
 
 logger = logging.getLogger(__name__)
 

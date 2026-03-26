@@ -5,7 +5,7 @@ import math
 from dataclasses import dataclass
 from typing import List, Optional
 
-from .autoisf_structs import GlucoseStatusAutoIsf
+from aaps_emulator.autoisf_structs import GlucoseStatusAutoIsf
 
 
 @dataclass

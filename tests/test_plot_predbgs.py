@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import pytest
 
 
-from core.autoisf_pipeline import run_autoisf_pipeline
+from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
 
 PLOTS_DIR = Path("data/reports/plots")
 

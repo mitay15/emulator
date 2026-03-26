@@ -10,9 +10,9 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
-from core.autoisf_pipeline import run_autoisf_pipeline
-from runner.build_inputs import build_inputs_from_block
-from runner.load_logs import load_logs
+from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
+from aaps_emulator.runner.build_inputs import build_inputs_from_block
+from aaps_emulator.runner.load_logs import load_logs
 
 logger = logging.getLogger("autoisf")
 logging.getLogger("autoisf").setLevel(logging.WARNING)
@@ -394,7 +394,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Compare AAPS logs with Python AutoISF emulator")
-    parser.add_argument("--log", default="data/logs")
+    parser.add_argument("--log", default=None)
     parser.add_argument("--report", action="store_true")
     parser.add_argument("--fast", action="store_true")
     parser.add_argument("--extract-clean", action="store_true")
@@ -402,14 +402,24 @@ if __name__ == "__main__":
 
     # Resolve paths
     paths = None
+
     if args.log:
         p = Path(args.log)
         if p.is_dir():
+            # clean mode
             clean_files = sorted(p.glob("block_*.json"))
             if clean_files:
                 paths = clean_files
-        if paths is None:
-            paths = [args.log]
+            else:
+                # normal mode: load all logs from directory
+                paths = (
+                    list(p.rglob("*.json"))
+                    + list(p.rglob("*.zip"))
+                    + list(p.rglob("*.log"))
+                )
+        else:
+            # single file
+            paths = [p]
 
     if paths is None:
         default_dir = Path(__file__).parent.parent / "data" / "logs"
@@ -428,11 +438,12 @@ if __name__ == "__main__":
 
     # SAVE REPORT
     if args.report:
-        report_dir = Path(__file__).parent.parent / "data" / "report"
+        report_dir = Path(__file__).parent.parent / "data" / "reports" / "compare"
         report_dir.mkdir(parents=True, exist_ok=True)
 
-        out = report_dir / "report.json"
+        out = report_dir / "summary.json"
         with out.open("w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
 
         print(f"\nОтчёт сохранён в: {out}")
+

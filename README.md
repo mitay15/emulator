@@ -1,19 +1,17 @@
-# AAPS Emulator — AUTOISF Algorithm Reimplementation
+# AAPS AutoISF Emulator
 
-AAPS Emulator — это полностью воспроизводимая Python‑реализация алгоритма **AUTOISF** из AndroidAPS 3.4, включая:
+Python‑эмулятор AutoISF (AAPS 3.0.1) с полным пайплайном сравнения Kotlin ↔ Python.
 
-- парсинг Kotlin‑логов AAPS  
-- восстановление входных данных алгоритма  
-- вычисление всех стадий AUTOISF  
-- сравнение с оригинальными результатами AAPS  
-- визуализацию предсказаний и ошибок  
-- генерацию отчётов и дашбордов  
+## Структура
 
-Проект создан для анализа, тестирования и исследования алгоритма AUTOISF вне AndroidAPS.
+- `core/` — реализация алгоритмов (AutoISF, predictions, determine_basal, future_iob_engine).
+- `runner/` — загрузка логов, сбор входов, сравнение с AAPS (`compare_runner`).
+- `tools/` — отчёты, визуализация, диагностика.
+- `tests/` — вспомогательные скрипты для ручной проверки.
 
----
+## Быстрый старт
 
-# 📦 Установка
+Полный пайплайн:
 
 ```bash
-pip install -r requirements.txt
+python run_all.py

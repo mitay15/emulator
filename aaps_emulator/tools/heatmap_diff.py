@@ -1,3 +1,4 @@
+# tools/heatmap_diff.py
 from __future__ import annotations
 
 import argparse
@@ -7,6 +8,9 @@ from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+# --- ВАЖНО: правильный корень пакета ---
+ROOT = Path(__file__).parent.parent
 
 
 def _load_summary(path: Path) -> Dict[str, Any]:
@@ -72,20 +76,20 @@ def main() -> None:
     parser.add_argument(
         "--summary",
         type=str,
-        default="reports/compare/summary.json",
+        default=str(ROOT / "data" / "reports" / "compare" / "summary.json"),
         help="Path to summary.json (from compare_runner)",
     )
     parser.add_argument(
         "--out",
         type=str,
-        default="reports/heatmaps/diff_heatmap.png",
+        default=str(ROOT / "data" / "reports" / "heatmaps" / "diff_heatmap.png"),
         help="Output PNG path",
     )
     args = parser.parse_args()
 
     summary_path = Path(args.summary)
     data = _load_summary(summary_path)
-    rows = data.get("rows") or []
+    rows = data.get("results") or []
 
     if not rows:
         raise SystemExit("No rows in summary.json")

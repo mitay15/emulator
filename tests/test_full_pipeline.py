@@ -1,20 +1,20 @@
 # tests/test_full_pipeline.py
 import pytest
 
-from core.autoisf_pipeline import run_autoisf_pipeline
-from core.autoisf_structs import (
+from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
+from aaps_emulator.core.autoisf_structs import (
     AutoIsfInputs,
     AutosensResult,
     IobTotal,
     MealData,
     Profile,
 )
-from core.future_iob_engine import generate_future_iob
-from core.glucose_status_autoisf import (
+from aaps_emulator.core.future_iob_engine import generate_future_iob
+from aaps_emulator.core.glucose_status_autoisf import (
     BucketedEntry,
     compute_glucose_status_autoisf,
 )
-from core.predictions import run_predictions
+from aaps_emulator.core.predictions import run_predictions
 
 
 @pytest.mark.integration

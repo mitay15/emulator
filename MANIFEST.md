@@ -1,337 +1,212 @@
-# 📄 **MANIFEST.md — Полное описание проекта AAPS Emulator**
+# 📄 **MANIFEST.md — Полное описание проекта AAPS Emulator (АКТУАЛЬНО)**
 
 ## 📌 Назначение проекта
 
-AAPS Emulator — это полностью воспроизводимая Python‑реализация алгоритма **AUTOISF** и связанных модулей AndroidAPS 3.4, включая:
+**AAPS Emulator** — это полноценный Python‑пакет, реализующий алгоритм **AUTOISF** и связанные компоненты AndroidAPS 3.4:
 
 - парсинг Kotlin‑логов AAPS  
 - восстановление входных данных алгоритма  
 - выполнение AutoISF → Predictions → DetermineBasal  
-- сравнение результатов Python ↔ AAPS  
-- генерацию отчётов и визуализаций  
+- сравнение Python ↔ AAPS  
+- генерация отчётов и визуализаций  
+- интерактивный HTML‑отчёт  
 
 Проект предназначен для анализа, тестирования и исследования алгоритма AUTOISF вне AndroidAPS.
 
 ---
 
-# 📁 **1. Корневая структура проекта**
+# 📁 **1. Корневая структура проекта (ПАКЕТ)**
 
-aaps_emulator/                     ← корень проекта (репозиторий и пакет)
+```
+AAPS-Emulator/
 │
-├── __init__.py                    ← пакет Python
-├── run.py                         ← CLI
-│
-├── core/                          ← алгоритм AUTOISF
-│   ├── autoisf_pipeline.py
-│   ├── autoisf_structs.py
-│   ├── determine_basal.py
-│   ├── future_iob_engine.py
-│   ├── glucose_status_autoisf.py
-│   ├── predictions.py
-│   ├── utils.py
-│   └── ...
-│
-├── runner/                        ← парсинг логов, сравнение
-│   ├── compare_runner.py
-│   ├── load_logs.py
-│   ├── build_inputs.py
-│   ├── kotlin_parser.py
-│   ├── generate_report.py
-│   └── ...
-│
-├── visual/                        ← визуализация
-│   ├── dashboard.py
-│   ├── plot_predbgs.py
-│   └── ...
-│
-├── tools/                         ← утилиты
-│   ├── show_inputs.py
-│   ├── filter_clean_blocks.py
-│   ├── generate_inputs_from_logs.py
-│   ├── generate_inputs_cache.py
-│   └── ...
-│
-├── data/                          ← данные
-│   ├── cache/
-│   ├── logs/
-│   └── reports/
-│
-├── tests/                         ← тесты
-│   ├── test_single_block_from_log.py
-│   ├── test_all_blocks_parametrized.py
-│   ├── test_full_pipeline.py
-│   ├── test_full_suite.py
-│   ├── test_plot_predbgs.py
-│   ├── test_heatmap.py
-│   ├── test_kotlin_parser.py
-│   ├── conftest.py
-│   └── ...
-│
+├── pyproject.toml
 ├── README.md
-├── setup.py
-├── setup.cfg
-├── py
+├── run_all.py
+├── run_tests.py
+│
+└── aaps_emulator/                 ← Python‑пакет
+    │
+    ├── __init__.py
+    │
+    ├── core/
+    │   ├── __init__.py
+    │   ├── autoisf_pipeline.py
+    │   ├── autoisf_structs.py
+    │   ├── determine_basal.py
+    │   ├── future_iob_engine.py
+    │   ├── glucose_status_autoisf.py
+    │   ├── predictions.py
+    │   ├── utils.py
+    │
+    ├── runner/
+    │   ├── __init__.py
+    │   ├── compare_runner.py
+    │   ├── load_logs.py
+    │   ├── build_inputs.py
+    │   ├── kotlin_parser.py
+    │
+    ├── tools/
+    │   ├── __init__.py
+    │   ├── run_full_report.py
+    │   ├── plot_predbg_diff.py
+    │   ├── heatmap_diff.py
+    │   ├── generate_inputs_from_logs.py
+    │   ├── debug_one_block.py
+    │   ├── diff_report.py
+    │   ├── generate_html_report_interactive.py
+    │   ├── show_inputs.py
+    │
+    ├── tests/
+    │   ├── __init__.py
+    │   ├── conftest.py
+    │   ├── test_single_block_from_log.py
+    │   ├── test_all_blocks_parametrized.py
+    │   ├── test_full_pipeline.py
+    │   ├── test_full_suite.py
+    │   ├── test_plot_predbgs.py
+    │   ├── test_heatmap.py
+    │   ├── test_kotlin_parser.py
+    │
+    └── data/
+        ├── cache/
+        ├── logs/
+        └── reports/
+```
 
 ---
 
-# 📁 **2. Пакет aaps_emulator/**
+# ❌ **2. Файлы, которые были удалены (и НЕ должны быть в MANIFEST.md)**
 
-Главный Python‑пакет.
+Эти файлы были удалены как устаревшие, дублирующие или сломанные:
 
-### 📄 `__init__.py`
-Обозначает пакет.
-
-### 📄 `run.py`
-CLI‑интерфейс:
-
-- принимает аргументы `--log`, `--html`, `--csv`, `--fast`, `--dump-parsed`
-- вызывает compare_runner
-- строит HTML‑дашборд
-- сохраняет CSV‑отчёты
+```
+aaps_emulator/runner/generate_report.py
+aaps_emulator/tools/check_report.py
+aaps_emulator/tools/inspect_cache.py
+aaps_emulator/tools/filter_clean_blocks.py
+aaps_emulator/tools/debug_eventualbg.py
+aaps_emulator/tools/generate_html_report.py
+run.py
+```
 
 ---
 
 # 📁 **3. core/** — Алгоритм AUTOISF
 
-Основная логика алгоритма.
+### ✔ autoisf_pipeline.py  
+Главный pipeline: AutoISF → Predictions → DetermineBasal.
 
-### 📄 `autoisf_pipeline.py`
-Главный pipeline:
+### ✔ autoisf_structs.py  
+Структуры данных: Profile, Autosens, Meal, IOB, Inputs, GlucoseStatus.
 
-- собирает inputs
-- вызывает AutoISF
-- вызывает Predictions
-- вызывает DetermineBasal
-- возвращает полный результат блока
+### ✔ glucose_status_autoisf.py  
+Анализ истории BG: delta, short_avg, long_avg, фильтрация.
 
-### 📄 `autoisf_module.py`
-Реализация AutoISF:
+### ✔ predictions.py  
+Предсказания BG: eventualBG, minPredBG, minGuardBG, predBGs.
 
-- autosens
-- meal adjustments
-- UAM adjustments
-- sensitivity scaling
-- variable_sens
+### ✔ determine_basal.py  
+DetermineBasal: insulinReq, rate, duration, SMB, safety caps.
 
-### 📄 `autoisf_structs.py`
-Структуры данных:
-
-- Profile
-- Autosens
-- Meal
-- IOB
-- Inputs
-- GlucoseStatus
-
-### 📄 `glucose_status_autoisf.py`
-Анализ истории BG:
-
-- delta
-- short_avg
-- long_avg
-- noise filtering
-
-### 📄 `future_iob_engine.py`
+### ✔ future_iob_engine.py  
 Генерация будущего IOB.
 
-### 📄 `predictions.py`
-Полный движок предсказаний:
-
-- eventualBG
-- minPredBG
-- minGuardBG
-- predBGs (IOB/COB/UAM/ZT)
-
-### 📄 `determine_basal.py`
-Реализация DetermineBasal:
-
-- insulinReq
-- rate
-- duration
-- SMB
-- safety caps
-- LGS threshold
-
-### 📄 `utils.py`
-Вспомогательные функции:
-
-- round_half_even
-- безопасный парсер чисел
-- форматирование
+### ✔ utils.py  
+Вспомогательные функции.
 
 ---
 
 # 📁 **4. runner/** — Парсинг логов и сравнение
 
-### 📄 `compare_runner.py`
-Главный модуль сравнения Python ↔ AAPS:
+### ✔ compare_runner.py  
+Главный модуль сравнения Python ↔ AAPS.
 
-- загружает логи
-- собирает блоки
-- строит inputs
-- запускает pipeline
-- сравнивает результаты
-- сохраняет mismatch‑блоки
-- генерирует summary.csv / summary.json
+### ✔ load_logs.py  
+Загрузка логов (JSON, ZIP, LOG).
 
-### 📄 `load_logs.py`
-Загрузка логов:
+### ✔ kotlin_parser.py  
+Парсинг Kotlin‑структур.
 
-- JSON
-- ZIP
-- LOG
-
-### 📄 `kotlin_parser.py`
-Разбор Kotlin‑структур:
-
-- превращает Kotlin‑объекты в Python‑dict
-
-### 📄 `build_inputs.py`
-Восстановление входных данных:
-
-- glucose_status
-- autosens
-- profile
-- meal
-- iob_data_array
-
-### 📄 `generate_report.py`
-Генерация CSV‑отчётов.
-
-### 📄 `generate_inputs_from_logs.py`
-Создание `inputs_before_algo_block_*.json`.
-
-### 📄 `generate_inputs_cache.py`
-Кеширование inputs.
+### ✔ build_inputs.py  
+Восстановление входных данных из логов.
 
 ---
 
-# 📁 **5. visual/** — Визуализация
+# 📁 **5. tools/** — Утилиты и отчёты
 
-### 📄 `dashboard.py`
-HTML‑дашборд Plotly:
+### ✔ run_full_report.py  
+Полный отчёт: compare_runner → heatmap → predBG diff → интерактивный HTML.
 
-- графики BG
-- predBGs
-- ошибки
-- сравнение Python ↔ AAPS
+### ✔ plot_predbg_diff.py  
+Универсальный график AAPS vs Python.
 
-### 📄 `plot_predbgs.py`
-Графики предсказаний BG.
+### ✔ heatmap_diff.py  
+Тепловая карта ошибок.
 
-### 📄 `heatmap.py`
-Тепловые карты ошибок.
+### ✔ generate_inputs_from_logs.py  
+Создание inputs_before_algo_block_*.json.
 
----
+### ✔ debug_one_block.py  
+Глубокая диагностика mismatch‑блока.
 
-# 📁 **6. tools/** — Утилиты
+### ✔ diff_report.py  
+Статистика по CSV.
 
-### 📄 `show_inputs.py`
-Показ входных данных по номеру блока.
+### ✔ generate_html_report_interactive.py  
+Интерактивный Plotly‑отчёт.
 
-### 📄 `filter_clean_blocks.py`
-Фильтрация clean‑блоков.
-
-### 📄 `generate_inputs_from_logs.py`
-Генерация inputs из логов.
-
-### 📄 `generate_inputs_cache.py`
-Создание кеша inputs.
+### ✔ show_inputs.py  
+Просмотр входов по номеру блока.
 
 ---
 
-# 📁 **7. tests/** — Тесты
+# 📁 **6. tests/** — Тесты
 
-### 📄 `test_full_pipeline.py`
-Smoke‑тест pipeline.
+Все тесты актуальны и соответствуют пакетной структуре:
 
-### 📄 `test_all_blocks_parametrized.py`
-Проверка всех блоков из cache.
-
-### 📄 `test_single_block_from_log.py`
-Тест одного блока.
-
-### 📄 `test_kotlin_parser.py`
-Тест парсера Kotlin.
-
-### 📄 `test_plot_predbgs.py`
-Тест графиков.
-
-### 📄 `test_heatmap.py`
-Тест heatmap.
-
-### 📄 `test_full_suite.py`
-Полный интеграционный тест.
-
-### 📄 `conftest.py`
-Фикстуры.
+- test_single_block_from_log.py  
+- test_all_blocks_parametrized.py  
+- test_full_pipeline.py  
+- test_full_suite.py  
+- test_plot_predbgs.py  
+- test_heatmap.py  
+- test_kotlin_parser.py  
+- conftest.py  
 
 ---
 
-# 📁 **8. data/** — Данные
+# 📁 **7. data/** — Данные
 
-### 📁 `logs/`
-Исходные AAPS‑логи.
+### ✔ cache/  
+inputs_before_algo_block_*.json  
+mismatch_block_*.json  
 
-### 📁 `cache/`
-inputs_before_algo_block_*.json.
+### ✔ logs/  
+исходные AAPS‑логи  
 
-### 📁 `clean/`
-clean‑блоки.
-
-### 📁 `reports/`
-CSV/HTML отчёты.
-
-### 📄 `mismatch_block_*.json`
-Mismatch‑диагностика.
+### ✔ reports/  
+summary.json  
+heatmaps  
+predbg_diff  
+interactive HTML  
 
 ---
 
-# 📁 **9. reports/**
+# 📁 **8. Конфигурация пакета**
 
-Автоматически генерируемые:
+### ✔ pyproject.toml  
+Единственный корректный способ установки пакета.
 
-- summary.csv  
-- summary.json  
+### ✔ run_all.py  
+Единая точка входа для полного пайплайна.
 
----
-
-# 📁 **10. Конфигурационные файлы**
-
-### 📄 `setup.py`
-Установка пакета.
-
-### 📄 `setup.cfg`
-Настройки ruff, pytest, mypy.
-
-### 📄 `pyproject.toml`
-Мета‑конфигурация.
-
-### 📄 `requirements.txt`
-Зависимости.
-
-### 📄 `pytest.ini`
-Настройки pytest.
-
-### 📄 `.gitignore`
-Исключения.
-
-### 📄 `.pre-commit-config.yaml`
-Хуки ruff + mypy.
+### ✔ run_tests.py  
+Запуск тестов.
 
 ---
 
-# 📁 **11. Служебные файлы**
-
-### 📄 `run_tests.py`
-Удобный запуск тестов.
-
-### 📄 `README.md`
-Документация.
-
----
-
-# 📁 **12. Оригинальные файлы AAPS 3.4 (референс)**
+# 📁 **9. Оригинальные файлы AAPS 3.4 (референс)**
 
 Ты просил, чтобы я их помнил — и я помню:
 
@@ -357,4 +232,3 @@ Mismatch‑диагностика.
 - MealData.kt  
 
 ---
-

@@ -5,7 +5,7 @@ repos:
   # Ruff — линтер, форматтер, сортировщик импортов
   # ---------------------------------------------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.6
+    rev: v0.5.0
     hooks:
       - id: ruff
         name: ruff (lint + fix)
@@ -22,21 +22,3 @@ repos:
           - "--in-place"
           - "--remove-all-unused-imports"
           - "--recursive"
-
-  # ---------------------------------------------------------
-  # Mypy — НЕ блокирует коммиты, проверяет только core/ и runner/
-  # ---------------------------------------------------------
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.1
-    hooks:
-      - id: mypy
-        name: mypy (non-blocking)
-        args:
-          - "--ignore-missing-imports"
-          - "--install-types"
-          - "--non-interactive"
-        pass_filenames: true
-        always_run: false
-        fail_fast: false
-        files: "^(aaps_emulator/|core/|runner/)"
-        exclude: "^(tests/|tools/)"

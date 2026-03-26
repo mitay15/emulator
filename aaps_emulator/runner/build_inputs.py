@@ -7,7 +7,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Dict, List
 
-from core.autoisf_structs import (
+from aaps_emulator.core.autoisf_structs import (
     AutoIsfInputs,
     AutosensResult,
     GlucoseStatusAutoIsf,

@@ -1,18 +1,15 @@
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "emulator"
-version = "3.0.0"
-description = "Python emulator of AAPS AutoISF and predictions engine"
+name = "aaps_emulator"
+version = "0.1.0"
+description = "AAPS AutoISF Python Emulator"
 requires-python = ">=3.10"
-
 dependencies = [
     "numpy",
+    "pandas",
     "matplotlib",
-    "pytest",
+    "plotly",
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

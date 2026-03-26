@@ -1,10 +1,11 @@
+# aaps_emulator/core/future_iob_engine.py
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
 from typing import List, Optional
 
-from core.autoisf_structs import IobTotal
+from aaps_emulator.core.autoisf_structs import IobTotal
 
 
 @dataclass

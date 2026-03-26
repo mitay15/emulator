@@ -5,9 +5,9 @@ import math
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from core.autoisf_structs import IobTotal
-from core.utils import round_half_even
-from runner.build_inputs import AutoIsfInputs
+from aaps_emulator.core.autoisf_structs import IobTotal
+from aaps_emulator.core.utils import round_half_even
+from aaps_emulator.runner.build_inputs import AutoIsfInputs
 
 
 def _round(value: float, digits: int = 0) -> float:

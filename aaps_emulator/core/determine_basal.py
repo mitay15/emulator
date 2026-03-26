@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from core.autoisf_structs import (
+from aaps_emulator.core.autoisf_structs import (
     AutoIsfInputs,
     AutosensResult,
     CorePredResultAlias,
@@ -15,8 +15,8 @@ from core.autoisf_structs import (
     TempBasal,
     safe_get,
 )
-from core.future_iob_engine import InsulinCurveParams, generate_future_iob
-from core.utils import round_half_even
+from aaps_emulator.core.future_iob_engine import InsulinCurveParams, generate_future_iob
+from aaps_emulator.core.utils import round_half_even
 
 
 # helper rounding wrappers used in determine_basal

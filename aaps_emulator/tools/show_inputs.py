@@ -1,4 +1,4 @@
-# tests/show_inputs.py
+# tools/show_inputs.py
 import json
 from pathlib import Path
 

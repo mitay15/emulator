@@ -1,8 +1,9 @@
+# tools/compare_with_aaps.py
 from __future__ import annotations
 
-from runner.load_logs import load_logs
-from core.autoisf_pipeline import run_autoisf_pipeline
-from core.autoisf_structs import AutoIsfInputs
+from aaps_emulator.runner.load_logs import load_logs
+from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
+from aaps_emulator.core.autoisf_structs import AutoIsfInputs
 
 import sys
 import json
