@@ -6,7 +6,7 @@ __pycache__/
 
 # --- Virtual environments ---
 venv/
-.env/
+.env
 
 # --- IDE / Editor ---
 .vscode/
@@ -22,30 +22,31 @@ venv/
 dist/
 build/
 
-# --- Logs, dumps, debug output ---
-*.log
-*.zip
+# --- Logs, dumps, debug output (only generated ones) ---
+# Не игнорируем все .log/.zip глобально — только в сгенерированных папках
+# *.log
+# *.zip
 
-# --- Generated data files ---
-*.json
-*.csv
-*.html
-*.png
+# --- Generated data files (only generated folders) ---
+# Не игнорируем все .json глобально
+# *.json
+# *.csv
+# *.html
+# *.png
 
 # --- Project-specific generated folders ---
 data/reports/
 project_dump/
 debug_bundle_*/
 
-# Keep folder structure but ignore contents
+# Keep folder structure but ignore contents of generated cache
 data/cache/*
 !data/cache/.gitkeep
 
-data/logs/*
-!data/logs/.gitkeep
-
-data/reports/*
-!data/reports/.gitkeep
+# Если вы НЕ хотите хранить локальные логи в корне, указывайте конкретную папку.
+# Не игнорируем aaps_emulator/data/logs по умолчанию — если хотите игнорировать, раскомментируйте:
+# aaps_emulator/data/logs/*
+# !aaps_emulator/data/logs/.gitkeep
 
 # --- Tools output ---
 tree.txt
