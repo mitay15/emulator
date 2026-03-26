@@ -1,29 +1,22 @@
-
-И вставь:
-
-```yaml
 name: CI
 
 on:
-  push:
-  pull_request:
+  - push
+  - pull_request
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install project
         run: |
           pip install -e .
           pip install -r requirements.txt || true
-
       - name: Run validator
         run: |
           python -m aaps_emulator.tools.validate_all
