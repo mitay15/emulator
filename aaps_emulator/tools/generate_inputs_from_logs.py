@@ -1,8 +1,8 @@
-# tools/generate_inputs_from_logs.py
 # aaps_emulator/tools/generate_inputs_from_logs.py
 import argparse
 import json
 from pathlib import Path
+import glob
 
 from aaps_emulator.runner.build_inputs import build_inputs_from_block
 from aaps_emulator.runner.load_logs import load_logs
@@ -88,11 +88,44 @@ def save_inputs_from_block(block, out_dir: Path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--logs", default="data/logs", help="path to logs dir or file")
+    # поддерживаем позиционный аргумент и опцию --logs
+    parser.add_argument("logs", nargs="?", default=None, help="path to logs dir or file (positional)")
+    parser.add_argument("--logs", dest="logs_opt", default=None, help="path to logs dir or file (option)")
     parser.add_argument("--out", default=str(OUT_DIR), help="output dir")
     args = parser.parse_args()
-    blocks = load_logs(args.logs)
+
+    # выбрать значение аргумента: позиционный > --logs > дефолт
+    logs_arg = args.logs if args.logs is not None else (args.logs_opt if args.logs_opt is not None else "data/logs")
+
+    logs_path = Path(logs_arg)
+    blocks = []
+
+    # Если передали директорию — перебираем файлы в ней и вызываем load_logs для каждого
+    if logs_path.is_dir():
+        for p in sorted(logs_path.iterdir()):
+            # пропускаем поддиректории
+            if p.is_dir():
+                continue
+            try:
+                blocks.extend(load_logs(str(p)))
+            except ValueError:
+                # пропускаем неподдерживаемые файлы
+                continue
+    else:
+        # если передали шаблон (glob) — обработаем совпадения
+        matched = glob.glob(logs_arg)
+        if matched:
+            for m in sorted(matched):
+                try:
+                    blocks.extend(load_logs(m))
+                except ValueError:
+                    continue
+        else:
+            # иначе пробуем как одиночный файл
+            blocks = load_logs(logs_arg)
+
     print("Loaded blocks:", len(blocks))
+
     # Group by GlucoseStatusAutoIsf occurrences
     grouped = []
     current = []
@@ -108,6 +141,7 @@ def main():
     if current:
         grouped.append(current)
     print("Grouped blocks:", len(grouped))
+
     out_dir = Path(args.out)
     for block in grouped:
         try:

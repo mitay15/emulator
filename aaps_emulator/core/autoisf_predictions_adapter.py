@@ -1,8 +1,8 @@
 # aaps_emulator/core/autoisf_predictions_adapter.py
 from __future__ import annotations
 
-from aaps_emulator.autoisf_structs import AutoIsfInputs, CorePredResultAlias
-from aaps_emulator.predictions import run_predictions
+from .autoisf_structs import AutoIsfInputs, CorePredResultAlias
+from .predictions import run_predictions
 
 
 def compute_core_predictions(inputs: AutoIsfInputs) -> CorePredResultAlias:

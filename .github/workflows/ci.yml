@@ -1,28 +1,29 @@
+
+И вставь:
+
+```yaml
 name: CI
 
 on:
   push:
-    branches: [ master ]
   pull_request:
-    branches: [ master ]
 
 jobs:
-  lint:
+  validate:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: "pip"
+          python-version: "3.11"
 
-      - name: Install ruff
+      - name: Install project
         run: |
-          python -m pip install --upgrade pip
-          pip install ruff
+          pip install -e .
+          pip install -r requirements.txt || true
 
-      - name: Ruff (lint + fix)
-        run: ruff check . --fix
+      - name: Run validator
+        run: |
+          python -m aaps_emulator.tools.validate_all

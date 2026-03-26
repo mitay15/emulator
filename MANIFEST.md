@@ -76,21 +76,6 @@ AAPS-Emulator/
 
 ---
 
-# ❌ **2. Файлы, которые были удалены (и НЕ должны быть в MANIFEST.md)**
-
-Эти файлы были удалены как устаревшие, дублирующие или сломанные:
-
-```
-aaps_emulator/runner/generate_report.py
-aaps_emulator/tools/check_report.py
-aaps_emulator/tools/inspect_cache.py
-aaps_emulator/tools/filter_clean_blocks.py
-aaps_emulator/tools/debug_eventualbg.py
-aaps_emulator/tools/generate_html_report.py
-run.py
-```
-
----
 
 # 📁 **3. core/** — Алгоритм AUTOISF
 
