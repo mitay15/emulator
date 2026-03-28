@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import re
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List
@@ -20,25 +19,29 @@ OBJECT_NAMES = [
     "Predictions",
 ]
 
-OBJ_RE = re.compile(
-    r".*?(?P<name>" + r"|".join(re.escape(n) for n in OBJECT_NAMES) + r")\s*\(",
-    re.DOTALL,
-)
 
+def _extract_objects_from_text(text: str) -> List[Dict[str, Any]]:
+    results: List[Dict[str, Any]] = []
+    if not text:
+        return results
 
-def _extract_objects_from_text(text: str) -> List[Dict]:
-    results = []
-
-    # --- Ускорение: фильтруем строки, чтобы не парсить весь лог ---
-    important = []
     for line in text.splitlines():
-        if any(name + "(" in line for name in OBJECT_NAMES):
-            important.append(line.strip())
+        line = line.strip()
+        if not line:
+            continue
 
-    if not important:
-        return []
+        # --- FIX: remove prefixes before Kotlin object ---
+        for name in OBJECT_NAMES:
+            marker = name + "("
+            if marker in line:
+                idx = line.index(marker)
+                line = line[idx:]
+                break
+        # ---------------------------------------------------
 
-    for line in important:
+        if not any(name + "(" in line for name in OBJECT_NAMES):
+            continue
+
         for name in OBJECT_NAMES:
             marker = name + "("
             if marker in line:
@@ -48,7 +51,6 @@ def _extract_objects_from_text(text: str) -> List[Dict]:
                     parsed = parse_kotlin_object(snippet)
                     results.append(parsed)
                 except Exception:
-                    # игнорируем нераспарсенные строки
                     continue
 
     return results
@@ -62,76 +64,85 @@ def _load_log_file(path: Path) -> List[Dict[str, Any]]:
 def _load_json_file(path: Path) -> List[Dict[str, Any]]:
     with path.open("r", encoding="utf-8") as f:
         data = json.load(f)
+
     if isinstance(data, list):
         return data
+
     for key in ("logs", "entries", "data"):
-        if key in data and isinstance(data[key], list):
-            return data[key]
+        v = data.get(key)
+        if isinstance(v, list):
+            return v
+
     return [data]
 
 
 def _load_zip_file(path: Path) -> List[Dict[str, Any]]:
-    blocks = []
+    blocks: List[Dict[str, Any]] = []
     with zipfile.ZipFile(path, "r") as z:
         for name in z.namelist():
-            if name.lower().endswith(".json"):
+            lname = name.lower()
+            try:
                 with z.open(name) as f:
-                    try:
-                        data = json.load(f)
-                        if isinstance(data, list):
-                            blocks.extend(data)
-                        else:
-                            blocks.append(data)
-                    except Exception:
-                        continue
-            elif name.lower().endswith(".log"):
-                with z.open(name) as f:
-                    try:
-                        text = f.read().decode("utf-8", errors="ignore")
-                        blocks.extend(_extract_objects_from_text(text))
-                    except Exception:
-                        continue
+                    if lname.endswith(".json"):
+                        try:
+                            data = json.load(f)
+                            if isinstance(data, list):
+                                blocks.extend(data)
+                            else:
+                                blocks.append(data)
+                        except Exception:
+                            continue
+                    elif lname.endswith(".log"):
+                        try:
+                            text = f.read().decode("utf-8", errors="ignore")
+                            blocks.extend(_extract_objects_from_text(text))
+                        except Exception:
+                            continue
+            except Exception:
+                continue
     return blocks
 
 
 def _iter_all_files_recursively(root: Path) -> List[Path]:
-    """Рекурсивно собирает все файлы JSON/LOG/ZIP."""
-    files = []
-    for p in root.rglob("*"):
-        if p.is_file() and p.suffix.lower() in (".json", ".log", ".zip"):
-            files.append(p)
-    return sorted(files)
+    return sorted(
+        p
+        for p in root.rglob("*")
+        if p.is_file() and p.suffix.lower() in (".json", ".log", ".zip")
+    )
 
 
 def load_logs(path: str | Path) -> List[Dict[str, Any]]:
     p = Path(path)
 
-    # 1) Если путь — директория → рекурсивно ищем все JSON/LOG/ZIP
     if p.is_dir():
         all_blocks: List[Dict[str, Any]] = []
         files = _iter_all_files_recursively(p)
-
         if not files:
-            raise ValueError(
-                f"В директории {p} не найдено ни одного файла .json/.log/.zip"
-            )
+            raise ValueError(f"В директории {p} не найдено ни одного файла .json/.log/.zip")
 
         for file in files:
-            if file.suffix.lower() == ".json":
+            suf = file.suffix.lower()
+            if suf == ".json":
                 all_blocks.extend(_load_json_file(file))
-            elif file.suffix.lower() == ".log":
+            elif suf == ".log":
                 all_blocks.extend(_load_log_file(file))
-            elif file.suffix.lower() == ".zip":
+            elif suf == ".zip":
                 all_blocks.extend(_load_zip_file(file))
 
         return all_blocks
 
-    # 2) Если путь — одиночный файл
-    if p.suffix.lower() == ".zip":
+    suf = p.suffix.lower()
+
+    # поддержка AndroidAPS ZIP логов
+    if suf == ".zip":
         return _load_zip_file(p)
-    if p.suffix.lower() == ".json":
+
+    # поддержка .log.json (AndroidAPS иногда так пишет)
+    if suf == ".json" or p.name.lower().endswith(".log.json"):
         return _load_json_file(p)
-    if p.suffix.lower() == ".log":
+
+    # обычные .log
+    if suf == ".log":
         return _load_log_file(p)
 
     raise ValueError(f"Неизвестный формат файла: {p}")

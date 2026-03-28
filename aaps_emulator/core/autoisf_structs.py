@@ -20,11 +20,40 @@ def safe_get(obj: Any, attr: str, default: Any = None) -> Any:
         return default
 
 
+class _BaseStruct:
+    """
+    Базовый класс для всех структур с полями raw/extras.
+    Даёт единое поведение:
+    - сохраняем исходный kwargs в raw
+    - известные поля пишем в атрибуты
+    - остальные — в extras
+    """
+
+    def _init_from_kwargs(self, kwargs: Dict[str, Any]) -> None:
+        raw_copy = dict(kwargs)
+        object.__setattr__(self, "raw", raw_copy)
+
+        known = {f.name for f in fields(self)}
+        extras: Dict[str, Any] = {}
+
+        for k, v in list(kwargs.items()):
+            if k in known:
+                try:
+                    setattr(self, k, v)
+                except Exception:
+                    # игнорируем неудачные присваивания, но не падаем
+                    pass
+            else:
+                extras[k] = v
+
+        object.__setattr__(self, "extras", extras)
+
+
 # -------------------------
 # Core data structures
 # -------------------------
 @dataclass
-class IobTotal:
+class IobTotal(_BaseStruct):
     """
     Compatible structure for total IOB/activity similar to AAPS.
     Accepts arbitrary kwargs in constructor; known fields are set,
@@ -38,16 +67,12 @@ class IobTotal:
     lastBolusTime: int = 0
     timestamp: Optional[int] = None
 
-    # raw original dict (for dumps and debugging)
     raw: Dict[str, Any] = field(default_factory=dict)
-
-    # extras: any other keys passed in kwargs
     extras: Dict[str, Any] = field(default_factory=dict)
 
     __type__: str = "IobTotal"
 
-    def __init__(self, **kwargs):
-        # initialize defaults first
+    def __init__(self, **kwargs: Any) -> None:
         object.__setattr__(self, "iob", 0.0)
         object.__setattr__(self, "activity", 0.0)
         object.__setattr__(self, "iobWithZeroTemp", None)
@@ -57,43 +82,27 @@ class IobTotal:
         object.__setattr__(self, "extras", {})
         object.__setattr__(self, "__type__", "IobTotal")
 
-        # keep a shallow copy of original kwargs as raw
-        raw_copy = dict(kwargs)
-        object.__setattr__(self, "raw", raw_copy)
-
-        # known field names (dataclass fields)
-        known = {f.name for f in fields(self)}
-
-        # set known fields except iobWithZeroTemp (handled separately)
-        for k in list(kwargs.keys()):
-            if k in known and k != "iobWithZeroTemp":
-                try:
-                    setattr(self, k, kwargs.pop(k))
-                except Exception:
-                    # ignore bad assignments
-                    kwargs.pop(k, None)
-
-        # handle iobWithZeroTemp specially (can be dict, IobTotal, None)
+        # отдельная обработка iobWithZeroTemp
         iwt = kwargs.pop("iobWithZeroTemp", None)
+
+        # стандартная инициализация известных/extra полей
+        self._init_from_kwargs(kwargs)
+
+        # обработка iobWithZeroTemp после основного init
         if isinstance(iwt, dict):
             try:
                 self.iobWithZeroTemp = IobTotal(**iwt)
             except Exception:
-                # fallback: keep raw dict in extras
                 self.iobWithZeroTemp = None
                 self.extras["iobWithZeroTemp_raw"] = iwt
         elif isinstance(iwt, IobTotal):
             self.iobWithZeroTemp = iwt
         else:
-            # if None or unknown type, set None (avoid self-reference)
             self.iobWithZeroTemp = None
-
-        # remaining keys -> extras
-        object.__setattr__(self, "extras", kwargs or {})
 
 
 @dataclass
-class GlucoseStatusAutoIsf:
+class GlucoseStatusAutoIsf(_BaseStruct):
     glucose: Optional[float] = None
     delta: Optional[float] = None
     shortAvgDelta: Optional[float] = None
@@ -118,8 +127,8 @@ class GlucoseStatusAutoIsf:
 
     __type__: str = "GlucoseStatusAutoIsf"
 
-    def __init__(self, **kwargs):
-        # defaults
+    def __init__(self, **kwargs: Any) -> None:
+        # дефолты
         object.__setattr__(self, "glucose", None)
         object.__setattr__(self, "delta", None)
         object.__setattr__(self, "shortAvgDelta", None)
@@ -140,22 +149,11 @@ class GlucoseStatusAutoIsf:
         object.__setattr__(self, "extras", {})
         object.__setattr__(self, "__type__", "GlucoseStatusAutoIsf")
 
-        raw_copy = dict(kwargs)
-        object.__setattr__(self, "raw", raw_copy)
-
-        known = {f.name for f in fields(self)}
-        for k in list(kwargs.keys()):
-            if k in known:
-                try:
-                    setattr(self, k, kwargs.pop(k))
-                except Exception:
-                    kwargs.pop(k, None)
-
-        object.__setattr__(self, "extras", kwargs or {})
+        self._init_from_kwargs(kwargs)
 
 
 @dataclass
-class TempBasal:
+class TempBasal(_BaseStruct):
     duration: Optional[int] = None
     rate: Optional[float] = None
     minutesrunning: Optional[int] = None
@@ -166,7 +164,7 @@ class TempBasal:
 
     __type__: str = "CurrentTemp"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         object.__setattr__(self, "duration", None)
         object.__setattr__(self, "rate", None)
         object.__setattr__(self, "minutesrunning", None)
@@ -175,22 +173,11 @@ class TempBasal:
         object.__setattr__(self, "extras", {})
         object.__setattr__(self, "__type__", "CurrentTemp")
 
-        raw_copy = dict(kwargs)
-        object.__setattr__(self, "raw", raw_copy)
-
-        known = {f.name for f in fields(self)}
-        for k in list(kwargs.keys()):
-            if k in known:
-                try:
-                    setattr(self, k, kwargs.pop(k))
-                except Exception:
-                    kwargs.pop(k, None)
-
-        object.__setattr__(self, "extras", kwargs or {})
+        self._init_from_kwargs(kwargs)
 
 
 @dataclass
-class OapsProfileAutoIsf:
+class OapsProfileAutoIsf(_BaseStruct):
     # basic targets
     min_bg: Optional[float] = None
     max_bg: Optional[float] = None
@@ -207,6 +194,7 @@ class OapsProfileAutoIsf:
     sens: Optional[float] = None
     variable_sens: Optional[float] = None
     autosens_max: Optional[float] = None
+    autosens_min: Optional[float] = None
 
     # AutoISF settings
     enable_autoISF: Optional[bool] = True
@@ -243,12 +231,16 @@ class OapsProfileAutoIsf:
     max_iob: Optional[float] = None
     iob_threshold_percent: Optional[float] = None
 
+    # доп. поля, которые могут приходить из профиля AAPS
+    half_basal_exercise_target: Optional[float] = None
+
     raw: Dict[str, Any] = field(default_factory=dict)
     extras: Dict[str, Any] = field(default_factory=dict)
 
     __type__: str = "OapsProfileAutoIsf"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
+        # дефолты
         object.__setattr__(self, "min_bg", None)
         object.__setattr__(self, "max_bg", None)
         object.__setattr__(self, "target_bg", None)
@@ -260,6 +252,7 @@ class OapsProfileAutoIsf:
         object.__setattr__(self, "sens", None)
         object.__setattr__(self, "variable_sens", None)
         object.__setattr__(self, "autosens_max", None)
+        object.__setattr__(self, "autosens_min", None)
         object.__setattr__(self, "enable_autoISF", True)
         object.__setattr__(self, "autoISF_min", None)
         object.__setattr__(self, "autoISF_max", None)
@@ -285,26 +278,16 @@ class OapsProfileAutoIsf:
         object.__setattr__(self, "lgsThreshold", None)
         object.__setattr__(self, "max_iob", None)
         object.__setattr__(self, "iob_threshold_percent", None)
+        object.__setattr__(self, "half_basal_exercise_target", None)
         object.__setattr__(self, "raw", {})
         object.__setattr__(self, "extras", {})
         object.__setattr__(self, "__type__", "OapsProfileAutoIsf")
 
-        raw_copy = dict(kwargs)
-        object.__setattr__(self, "raw", raw_copy)
-
-        known = {f.name for f in fields(self)}
-        for k in list(kwargs.keys()):
-            if k in known:
-                try:
-                    setattr(self, k, kwargs.pop(k))
-                except Exception:
-                    kwargs.pop(k, None)
-
-        object.__setattr__(self, "extras", kwargs or {})
+        self._init_from_kwargs(kwargs)
 
 
 @dataclass
-class AutosensResult:
+class AutosensResult(_BaseStruct):
     ratio: Optional[float] = None
     carb_ratio_adjustment: Optional[float] = None
     sens_adjustment: Optional[float] = None
@@ -312,26 +295,19 @@ class AutosensResult:
     extras: Dict[str, Any] = field(default_factory=dict)
     __type__: str = "AutosensResult"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         object.__setattr__(self, "ratio", None)
         object.__setattr__(self, "carb_ratio_adjustment", None)
         object.__setattr__(self, "sens_adjustment", None)
-        object.__setattr__(self, "raw", dict(kwargs))
+        object.__setattr__(self, "raw", {})
         object.__setattr__(self, "extras", {})
         object.__setattr__(self, "__type__", "AutosensResult")
 
-        known = {"ratio", "carb_ratio_adjustment", "sens_adjustment"}
-        for k in list(kwargs.keys()):
-            if k in known:
-                try:
-                    setattr(self, k, kwargs.pop(k))
-                except Exception:
-                    kwargs.pop(k, None)
+        self._init_from_kwargs(kwargs)
 
-        object.__setattr__(self, "extras", kwargs or {})
 
 @dataclass
-class MealData:
+class MealData(_BaseStruct):
     carbs: Optional[float] = None
     mealCOB: Optional[float] = None
     lastCarbTime: Optional[int] = None
@@ -342,7 +318,7 @@ class MealData:
     extras: Dict[str, Any] = field(default_factory=dict)
     __type__: str = "MealData"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         object.__setattr__(self, "carbs", None)
         object.__setattr__(self, "mealCOB", None)
         object.__setattr__(self, "lastCarbTime", None)
@@ -352,18 +328,7 @@ class MealData:
         object.__setattr__(self, "extras", {})
         object.__setattr__(self, "__type__", "MealData")
 
-        raw_copy = dict(kwargs)
-        object.__setattr__(self, "raw", raw_copy)
-
-        known = {f.name for f in fields(self)}
-        for k in list(kwargs.keys()):
-            if k in known:
-                try:
-                    setattr(self, k, kwargs.pop(k))
-                except Exception:
-                    kwargs.pop(k, None)
-
-        object.__setattr__(self, "extras", kwargs or {})
+        self._init_from_kwargs(kwargs)
 
 
 # -------------------------
@@ -408,6 +373,7 @@ class CorePredResultAlias:
     pred_zt: List[int] = field(default_factory=list)
     trace: List[Any] = field(default_factory=list)
     raw: Dict[str, Any] = field(default_factory=dict)
+
 
 # Alias for backward compatibility with tests expecting Profile
 Profile = OapsProfileAutoIsf

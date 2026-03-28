@@ -3,7 +3,10 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-CACHE_DIR = Path("data") / "cache"
+
+ROOT = Path(__file__).resolve().parents[2]
+DATA = ROOT / "data"
+CACHE_DIR = DATA / "cache"
 
 def load_block(idx: int) -> Dict[str, Any]:
     """Загрузить JSON блока по индексу. Бросает FileNotFoundError при отсутствии файла."""

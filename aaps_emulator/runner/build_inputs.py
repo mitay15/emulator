@@ -5,7 +5,7 @@ import json
 import logging
 import traceback
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from aaps_emulator.core.autoisf_structs import (
     AutoIsfInputs,
@@ -20,10 +20,7 @@ from aaps_emulator.core.autoisf_structs import (
 logger = logging.getLogger(__name__)
 
 
-# ----------------------------
-# Безопасные конвертеры
-# ----------------------------
-def _safe_float(v):
+def _safe_float(v: Any) -> Optional[float]:
     try:
         if v is None:
             return None
@@ -35,7 +32,7 @@ def _safe_float(v):
         return None
 
 
-def _safe_int(v):
+def _safe_int(v: Any) -> Optional[int]:
     try:
         if v is None:
             return None
@@ -47,13 +44,16 @@ def _safe_int(v):
         return None
 
 
-# ----------------------------
-# Конвертация объектов
-# ----------------------------
+def _find_first(block: List[Dict[str, Any]], type_name: str) -> Dict[str, Any]:
+    return next(
+        (o for o in block if isinstance(o, dict) and o.get("__type__") == type_name),
+        {},
+    )
+
+
 def _to_glucose_status(obj: Dict[str, Any]) -> GlucoseStatusAutoIsf:
     if not obj:
         return GlucoseStatusAutoIsf()
-
     try:
         return GlucoseStatusAutoIsf(
             glucose=_safe_float(obj.get("glucose")),
@@ -82,7 +82,6 @@ def _to_glucose_status(obj: Dict[str, Any]) -> GlucoseStatusAutoIsf:
 def _to_current_temp(obj: Dict[str, Any]) -> TempBasal:
     if not obj:
         return TempBasal()
-
     try:
         return TempBasal(
             duration=_safe_int(obj.get("duration")),
@@ -99,11 +98,8 @@ def _to_current_temp(obj: Dict[str, Any]) -> TempBasal:
 def _to_iob(od: Dict[str, Any]) -> IobTotal:
     if not od:
         return IobTotal()
-
     try:
-        # Вложенный iobWithZeroTemp может быть dict или None
         iwt = od.get("iobWithZeroTemp")
-        # Передаём iobWithZeroTemp как есть — конструктор IobTotal обработает dict/None/obj
         return IobTotal(
             iob=_safe_float(od.get("iob")),
             activity=_safe_float(od.get("activity")),
@@ -123,25 +119,15 @@ def _to_iob(od: Dict[str, Any]) -> IobTotal:
 def _to_profile(d: Dict[str, Any]) -> OapsProfileAutoIsf:
     if not d:
         return OapsProfileAutoIsf()
-
     try:
-        # если OapsProfileAutoIsf принимает kwargs, можно предварительно привести ключевые поля
         d2 = dict(d)
-        # приведение некоторых числовых полей
-        for k in (
-            "min_bg",
-            "max_bg",
-            "sens",
-            "variable_sens",
-            "current_basal",
-            "max_iob",
-            "lgsThreshold",
-        ):
+        for k in ("min_bg", "max_bg", "sens", "variable_sens", "current_basal", "max_iob", "lgsThreshold"):
             if k in d2:
+                val = _safe_float(d2.get(k))
                 if k == "lgsThreshold":
-                    d2[k] = _safe_float(d2.get(k))  # может быть None
+                    d2[k] = val
                 else:
-                    d2[k] = _safe_float(d2.get(k)) or d2.get(k)
+                    d2[k] = val if val is not None else d2.get(k)
         return OapsProfileAutoIsf(**d2)
     except Exception:
         logger.exception("Failed to convert profile object")
@@ -151,7 +137,6 @@ def _to_profile(d: Dict[str, Any]) -> OapsProfileAutoIsf:
 def _to_autosens(d: Dict[str, Any]) -> AutosensResult:
     if not d:
         return AutosensResult()
-
     try:
         return AutosensResult(**d)
     except Exception:
@@ -162,7 +147,6 @@ def _to_autosens(d: Dict[str, Any]) -> AutosensResult:
 def _to_meal(d: Dict[str, Any]) -> MealData:
     if not d:
         return MealData()
-
     try:
         return MealData(
             carbs=_safe_float(d.get("carbs")),
@@ -177,83 +161,55 @@ def _to_meal(d: Dict[str, Any]) -> MealData:
         return MealData()
 
 
-# ----------------------------
-# Главный сборщик входов
-# ----------------------------
+def _propagate_variable_sens_from_rt(rt_obj: Dict[str, Any], profile, autosens):
+    if not isinstance(rt_obj, dict):
+        return
+    vs_rt = rt_obj.get("variable_sens") or rt_obj.get("variableSens")
+    if vs_rt is None:
+        return
+    try:
+        if profile is not None:
+            profile.variable_sens = vs_rt
+            setattr(profile, "_variable_sens_from_rt", True)
+    except Exception:
+        pass
+    try:
+        if autosens is not None:
+            autosens.ratio = vs_rt
+            setattr(autosens, "_variable_sens_from_rt", True)
+    except Exception:
+        pass
+
+
 def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
     """
     Преобразует список объектов AutoISF-блока из логов AAPS
     в корректный AutoIsfInputs (core.autoisf_structs).
-    Исправлена ошибка: используем параметр `block` везде (не block_objs).
-    Также: если в RT есть variable_sens, переносим его в profile.
     """
-
     try:
-        # Ищем объекты по типам в переданном block (не block_objs)
-        gs_obj = next(
-            (
-                o
-                for o in block
-                if isinstance(o, dict) and o.get("__type__") == "GlucoseStatusAutoIsf"
-            ),
-            {},
-        )
-        ct_obj = next(
-            (
-                o
-                for o in block
-                if isinstance(o, dict) and o.get("__type__") == "CurrentTemp"
-            ),
-            {},
-        )
-        rt_obj = next(
-            (o for o in block if isinstance(o, dict) and o.get("__type__") == "RT"), {}
-        )
-        # --- ВСТАВИТЬ ЗДЕСЬ ---
-        algorithm = None
-        if isinstance(rt_obj, dict):
-            algorithm = rt_obj.get("algorithm")
+        gs_obj = _find_first(block, "GlucoseStatusAutoIsf")
+        ct_obj = _find_first(block, "CurrentTemp")
+        rt_obj = _find_first(block, "RT")
 
-        # Оборачиваем в объект, чтобы compare_runner видел алгоритм
+        algorithm = rt_obj.get("algorithm") if isinstance(rt_obj, dict) else None
         algo_marker = {"algorithm": algorithm}
-        # --------------------------------
 
         profile_obj = (
             rt_obj.get("profile") if isinstance(rt_obj, dict) else None
-        ) or next(
-            (
-                o
-                for o in block
-                if isinstance(o, dict) and o.get("__type__") == "OapsProfileAutoIsf"
-            ),
-            {},
-        )
+        ) or _find_first(block, "OapsProfileAutoIsf")
+
         autosens_obj = (
             rt_obj.get("autosens") if isinstance(rt_obj, dict) else None
-        ) or next(
-            (
-                o
-                for o in block
-                if isinstance(o, dict) and o.get("__type__") == "AutosensResult"
-            ),
-            {},
-        )
+        ) or _find_first(block, "AutosensResult")
+
         meal_obj = (
             rt_obj.get("mealData") if isinstance(rt_obj, dict) else None
-        ) or next(
-            (
-                o
-                for o in block
-                if isinstance(o, dict) and o.get("__type__") == "MealData"
-            ),
-            {},
-        )
+        ) or _find_first(block, "MealData")
 
         iob_objs = [
             o for o in block if isinstance(o, dict) and o.get("__type__") == "IobTotal"
         ]
 
-        # Конвертация в core-структуры (оборачиваем вызовы в try, чтобы локализовать ошибки)
         try:
             gs = _to_glucose_status(gs_obj)
         except Exception:
@@ -266,54 +222,28 @@ def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
 
         try:
             profile = _to_profile(profile_obj)
-            # --- propagate RT.variable_sens into profile ---
-            try:
-                if isinstance(rt_obj, dict) and profile is not None:
-                    vs_rt = rt_obj.get("variable_sens") or rt_obj.get("variableSens")
-                    if vs_rt is not None:
-                        profile.variable_sens = vs_rt
-                        setattr(profile, "_variable_sens_from_rt", True)
-                        # print("DEBUG: RT variable_sens propagated into profile:", vs_rt)
-            except Exception:
-                pass
-                # print("DEBUG: propagate RT variable_sens failed:", e)
-            # ------------------------------------------------
-
         except Exception:
             profile = None
 
         try:
             autosens = _to_autosens(autosens_obj)
-            # --- propagate RT.variable_sens into autosens if present ---
-            try:
-                if isinstance(rt_obj, dict) and autosens is not None:
-                    vs_rt = rt_obj.get("variable_sens") or rt_obj.get("variableSens")
-                    if vs_rt is not None:
-                        autosens.ratio = vs_rt
-                        setattr(autosens, "_variable_sens_from_rt", True)
-                        # print("DEBUG: RT variable_sens propagated into autosens:", vs_rt)
-            except Exception:
-                pass
-                # print("DEBUG: propagate RT variable_sens into autosens failed:", e)
-            # -----------------------------------------------------------
-
         except Exception:
             autosens = None
+
+        _propagate_variable_sens_from_rt(rt_obj, profile, autosens)
 
         try:
             meal = _to_meal(meal_obj)
         except Exception:
             meal = None
 
-        iob_array = []
+        iob_array: List[IobTotal] = []
         for o in iob_objs:
             try:
                 iob_array.append(_to_iob(o))
             except Exception:
-                # если один iob не конвертируется — пропускаем, но продолжаем
                 continue
 
-        # Собираем итоговый AutoIsfInputs
         return AutoIsfInputs(
             glucose_status=gs,
             current_temp=ct,
@@ -326,9 +256,8 @@ def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
         )
 
     except Exception as exc:
-        # Логируем ошибку и сохраняем дамп для отладки
         try:
-            cache_dir = Path(__file__).parent.parent / "data" / "cache"
+            cache_dir = Path(__file__).resolve().parents[2] / "data" / "cache"
             cache_dir.mkdir(parents=True, exist_ok=True)
             out = cache_dir / "parsed_block_on_error.json"
             with out.open("w", encoding="utf-8") as f:

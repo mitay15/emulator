@@ -1,0 +1,395 @@
+**********************
+PowerShell transcript start
+Start time: 20260326143104
+Username: INGPPO1\IngPPO1
+RunAs User: INGPPO1\IngPPO1
+Configuration Name: 
+Machine: INGPPO1 (Microsoft Windows NT 10.0.19045.0)
+Host Application: C:\Program Files\PowerShell\7-preview\pwsh.dll
+Process ID: 12352
+PSVersion: 7.1.0-rc.1
+PSEdition: Core
+GitCommitId: 7.1.0-rc.1
+OS: Microsoft Windows 10.0.19045
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.10032.0, 6.0.0, 6.1.0, 6.2.0, 7.0.0, 7.1.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+Transcript started, output file is scripts/check_all.log
+=== CHECK ALL START ===
+Working dir: C:\Users\IngPPO1\Desktop\AAPS-Emulator
+Python: Python 3.11.0
+Pip: pip 22.3 from C:\Users\IngPPO1\Desktop\AAPS-Emulator\venv\Lib\site-packages\pip (python 3.11)
+
+
+1) Running pre-commit hooks...
+ruff (lint + fix)........................................................Passed
+autoflake................................................................Passed
+
+2) Running ruff check (python -m ruff)...
+
+3) Running pytest...
+................................................................................................................ [ 46%]
+................................................................................................................ [ 92%]
+..................                                                                                               [100%]
+242 passed in 66.80s (0:01:06)
+
+4) Generating inputs from logs...
+Loaded blocks: 2358
+Grouped blocks: 244
+Skip (exists): data\cache\inputs_before_algo_block_1768425315211.json
+Skip (exists): data\cache\inputs_before_algo_block_1768425675223.json
+Skip (exists): data\cache\inputs_before_algo_block_1768425975106.json
+Skip (exists): data\cache\inputs_before_algo_block_1768426275167.json
+Skip (exists): data\cache\inputs_before_algo_block_1768427594928.json
+Skip (exists): data\cache\inputs_before_algo_block_1768428194871.json
+Skip (exists): data\cache\inputs_before_algo_block_1768430114736.json
+Skip (exists): data\cache\inputs_before_algo_block_1768430714690.json
+Skip (exists): data\cache\inputs_before_algo_block_1768435094261.json
+Skip (exists): data\cache\inputs_before_algo_block_1768435394142.json
+Skip (exists): data\cache\inputs_before_algo_block_1768436174100.json
+Skip (exists): data\cache\inputs_before_algo_block_1768440073801.json
+Skip (exists): data\cache\inputs_before_algo_block_1768440373682.json
+Skip (exists): data\cache\inputs_before_algo_block_1768440673745.json
+Skip (exists): data\cache\inputs_before_algo_block_1768440973626.json
+Skip (exists): data\cache\inputs_before_algo_block_1768441273687.json
+Skip (exists): data\cache\inputs_before_algo_block_1768441573569.json
+Skip (exists): data\cache\inputs_before_algo_block_1768441873632.json
+Skip (exists): data\cache\inputs_before_algo_block_1768442173513.json
+Skip (exists): data\cache\inputs_before_algo_block_1768442473576.json
+Skip (exists): data\cache\inputs_before_algo_block_1768442773457.json
+Skip (exists): data\cache\inputs_before_algo_block_1768443073516.json
+Skip (exists): data\cache\inputs_before_algo_block_1768443373398.json
+Skip (exists): data\cache\inputs_before_algo_block_1768443673460.json
+Skip (exists): data\cache\inputs_before_algo_block_1768443973329.json
+Skip (exists): data\cache\inputs_before_algo_block_1768444273391.json
+Skip (exists): data\cache\inputs_before_algo_block_1768444873332.json
+Skip (exists): data\cache\inputs_before_algo_block_1768445173222.json
+Skip (exists): data\cache\inputs_before_algo_block_1768445473284.json
+Skip (exists): data\cache\inputs_before_algo_block_1768445773345.json
+Skip (exists): data\cache\inputs_before_algo_block_1768446073255.json
+Skip (exists): data\cache\inputs_before_algo_block_1768446373108.json
+Skip (exists): data\cache\inputs_before_algo_block_1768446673166.json
+Skip (exists): data\cache\inputs_before_algo_block_1768446973052.json
+Skip (exists): data\cache\inputs_before_algo_block_1768446973052.json
+Skip (exists): data\cache\inputs_before_algo_block_1768447273111.json
+Skip (exists): data\cache\inputs_before_algo_block_1768447573122.json
+Skip (exists): data\cache\inputs_before_algo_block_1768447873005.json
+Skip (exists): data\cache\inputs_before_algo_block_1768448172886.json
+Skip (exists): data\cache\inputs_before_algo_block_1768448472949.json
+Skip (exists): data\cache\inputs_before_algo_block_1768448772828.json
+Skip (exists): data\cache\inputs_before_algo_block_1768449072941.json
+Skip (exists): data\cache\inputs_before_algo_block_1768449372823.json
+Skip (exists): data\cache\inputs_before_algo_block_1768449672880.json
+Skip (exists): data\cache\inputs_before_algo_block_1768449972766.json
+Skip (exists): data\cache\inputs_before_algo_block_1768450272828.json
+Skip (exists): data\cache\inputs_before_algo_block_1768450572709.json
+Skip (exists): data\cache\inputs_before_algo_block_1768450932659.json
+Skip (exists): data\cache\inputs_before_algo_block_1768451232722.json
+Skip (exists): data\cache\inputs_before_algo_block_1768451532603.json
+Skip (exists): data\cache\inputs_before_algo_block_1768451832653.json
+Skip (exists): data\cache\inputs_before_algo_block_1768452132906.json
+Skip (exists): data\cache\inputs_before_algo_block_1768452432607.json
+Skip (exists): data\cache\inputs_before_algo_block_1768452732486.json
+Skip (exists): data\cache\inputs_before_algo_block_1768453032541.json
+Skip (exists): data\cache\inputs_before_algo_block_1768453332422.json
+Skip (exists): data\cache\inputs_before_algo_block_1768453632483.json
+Skip (exists): data\cache\inputs_before_algo_block_1768453932367.json
+Skip (exists): data\cache\inputs_before_algo_block_1768454232424.json
+Skip (exists): data\cache\inputs_before_algo_block_1768454532319.json
+Skip (exists): data\cache\inputs_before_algo_block_1768454832382.json
+Skip (exists): data\cache\inputs_before_algo_block_1768454832382.json
+Skip (exists): data\cache\inputs_before_algo_block_1768455132248.json
+Skip (exists): data\cache\inputs_before_algo_block_1768455432324.json
+Skip (exists): data\cache\inputs_before_algo_block_1768455732206.json
+Skip (exists): data\cache\inputs_before_algo_block_1768456032267.json
+Skip (exists): data\cache\inputs_before_algo_block_1768456332149.json
+Skip (exists): data\cache\inputs_before_algo_block_1768456632201.json
+Skip (exists): data\cache\inputs_before_algo_block_1768456932092.json
+Skip (exists): data\cache\inputs_before_algo_block_1768457232155.json
+Skip (exists): data\cache\inputs_before_algo_block_1768457532036.json
+Skip (exists): data\cache\inputs_before_algo_block_1768457832093.json
+Skip (exists): data\cache\inputs_before_algo_block_1768458131980.json
+Skip (exists): data\cache\inputs_before_algo_block_1768458432042.json
+Skip (exists): data\cache\inputs_before_algo_block_1768458731923.json
+Skip (exists): data\cache\inputs_before_algo_block_1768459031982.json
+Skip (exists): data\cache\inputs_before_algo_block_1768459331863.json
+Skip (exists): data\cache\inputs_before_algo_block_1768459631749.json
+Skip (exists): data\cache\inputs_before_algo_block_1768459931811.json
+Skip (exists): data\cache\inputs_before_algo_block_1768460231692.json
+Skip (exists): data\cache\inputs_before_algo_block_1768460531739.json
+Skip (exists): data\cache\inputs_before_algo_block_1768460831634.json
+Skip (exists): data\cache\inputs_before_algo_block_1768461131701.json
+Skip (exists): data\cache\inputs_before_algo_block_1768461431579.json
+Skip (exists): data\cache\inputs_before_algo_block_1768461731641.json
+Skip (exists): data\cache\inputs_before_algo_block_1768462031708.json
+Skip (exists): data\cache\inputs_before_algo_block_1768462331583.json
+Skip (exists): data\cache\inputs_before_algo_block_1768462631466.json
+Skip (exists): data\cache\inputs_before_algo_block_1768462931525.json
+Skip (exists): data\cache\inputs_before_algo_block_1768463231478.json
+Skip (exists): data\cache\inputs_before_algo_block_1768463531532.json
+Skip (exists): data\cache\inputs_before_algo_block_1768463831409.json
+Skip (exists): data\cache\inputs_before_algo_block_1768464131296.json
+Skip (exists): data\cache\inputs_before_algo_block_1768464431356.json
+Skip (exists): data\cache\inputs_before_algo_block_1768464731235.json
+Skip (exists): data\cache\inputs_before_algo_block_1768465031288.json
+Skip (exists): data\cache\inputs_before_algo_block_1768465331181.json
+Skip (exists): data\cache\inputs_before_algo_block_1768465631244.json
+Skip (exists): data\cache\inputs_before_algo_block_1768465931125.json
+Skip (exists): data\cache\inputs_before_algo_block_1768466231183.json
+Skip (exists): data\cache\inputs_before_algo_block_1768466831129.json
+Skip (exists): data\cache\inputs_before_algo_block_1768467131010.json
+Skip (exists): data\cache\inputs_before_algo_block_1768467431070.json
+Skip (exists): data\cache\inputs_before_algo_block_1768467730942.json
+Skip (exists): data\cache\inputs_before_algo_block_1768468031006.json
+Skip (exists): data\cache\inputs_before_algo_block_1768468330897.json
+Skip (exists): data\cache\inputs_before_algo_block_1768468630950.json
+Skip (exists): data\cache\inputs_before_algo_block_1768468630950.json
+Skip (exists): data\cache\inputs_before_algo_block_1768468930848.json
+Skip (exists): data\cache\inputs_before_algo_block_1768469230903.json
+Skip (exists): data\cache\inputs_before_algo_block_1768469530785.json
+Skip (exists): data\cache\inputs_before_algo_block_1768469830843.json
+Skip (exists): data\cache\inputs_before_algo_block_1768470130726.json
+Skip (exists): data\cache\inputs_before_algo_block_1768470430733.json
+Skip (exists): data\cache\inputs_before_algo_block_1768470910636.json
+Skip (exists): data\cache\inputs_before_algo_block_1768470910636.json
+Skip (exists): data\cache\inputs_before_algo_block_1768471210697.json
+Skip (exists): data\cache\inputs_before_algo_block_1768471210697.json
+Skip (exists): data\cache\inputs_before_algo_block_1768471510569.json
+Skip (exists): data\cache\inputs_before_algo_block_1768471810642.json
+Skip (exists): data\cache\inputs_before_algo_block_1768472110520.json
+Skip (exists): data\cache\inputs_before_algo_block_1768472410588.json
+Skip (exists): data\cache\inputs_before_algo_block_1768472710467.json
+Skip (exists): data\cache\inputs_before_algo_block_1768473310400.json
+Skip (exists): data\cache\inputs_before_algo_block_1768473610470.json
+Skip (exists): data\cache\inputs_before_algo_block_1768473910352.json
+Skip (exists): data\cache\inputs_before_algo_block_1768473910352.json
+Skip (exists): data\cache\inputs_before_algo_block_1768474210413.json
+Skip (exists): data\cache\inputs_before_algo_block_1768474510296.json
+Skip (exists): data\cache\inputs_before_algo_block_1768474810357.json
+Skip (exists): data\cache\inputs_before_algo_block_1768475110241.json
+Skip (exists): data\cache\inputs_before_algo_block_1768475410301.json
+Skip (exists): data\cache\inputs_before_algo_block_1768475710180.json
+Skip (exists): data\cache\inputs_before_algo_block_1768476010242.json
+Skip (exists): data\cache\inputs_before_algo_block_1768476310125.json
+Skip (exists): data\cache\inputs_before_algo_block_1768476610174.json
+Skip (exists): data\cache\inputs_before_algo_block_1768476910065.json
+Skip (exists): data\cache\inputs_before_algo_block_1768477210132.json
+Skip (exists): data\cache\inputs_before_algo_block_1768477510013.json
+Skip (exists): data\cache\inputs_before_algo_block_1768477810075.json
+Skip (exists): data\cache\inputs_before_algo_block_1768478110316.json
+Skip (exists): data\cache\inputs_before_algo_block_1768478410019.json
+Skip (exists): data\cache\inputs_before_algo_block_1768478710079.json
+Skip (exists): data\cache\inputs_before_algo_block_1768479009961.json
+Skip (exists): data\cache\inputs_before_algo_block_1768479309842.json
+Skip (exists): data\cache\inputs_before_algo_block_1768479609906.json
+Skip (exists): data\cache\inputs_before_algo_block_1768479909785.json
+Skip (exists): data\cache\inputs_before_algo_block_1768480209849.json
+Skip (exists): data\cache\inputs_before_algo_block_1768480509728.json
+Skip (exists): data\cache\inputs_before_algo_block_1768480809791.json
+Skip (exists): data\cache\inputs_before_algo_block_1768481109671.json
+Skip (exists): data\cache\inputs_before_algo_block_1768481409734.json
+Skip (exists): data\cache\inputs_before_algo_block_1768481709616.json
+Skip (exists): data\cache\inputs_before_algo_block_1768482009698.json
+Skip (exists): data\cache\inputs_before_algo_block_1768482309555.json
+Skip (exists): data\cache\inputs_before_algo_block_1768482609616.json
+Skip (exists): data\cache\inputs_before_algo_block_1768482909500.json
+Skip (exists): data\cache\inputs_before_algo_block_1768483209562.json
+Skip (exists): data\cache\inputs_before_algo_block_1768483509446.json
+Skip (exists): data\cache\inputs_before_algo_block_1768483809505.json
+Skip (exists): data\cache\inputs_before_algo_block_1768484109392.json
+Skip (exists): data\cache\inputs_before_algo_block_1768484409448.json
+Skip (exists): data\cache\inputs_before_algo_block_1768484709336.json
+Skip (exists): data\cache\inputs_before_algo_block_1768485309278.json
+Skip (exists): data\cache\inputs_before_algo_block_1768485609337.json
+Skip (exists): data\cache\inputs_before_algo_block_1768485909215.json
+Skip (exists): data\cache\inputs_before_algo_block_1768486209281.json
+Skip (exists): data\cache\inputs_before_algo_block_1768486509161.json
+Skip (exists): data\cache\inputs_before_algo_block_1768486809224.json
+Skip (exists): data\cache\inputs_before_algo_block_1768487109105.json
+Skip (exists): data\cache\inputs_before_algo_block_1768487409166.json
+Skip (exists): data\cache\inputs_before_algo_block_1768488008919.json
+Skip (exists): data\cache\inputs_before_algo_block_1768488308992.json
+Skip (exists): data\cache\inputs_before_algo_block_1768488608873.json
+Skip (exists): data\cache\inputs_before_algo_block_1768488608873.json
+Skip (exists): data\cache\inputs_before_algo_block_1768488908934.json
+Skip (exists): data\cache\inputs_before_algo_block_1768489508880.json
+Skip (exists): data\cache\inputs_before_algo_block_1768489808941.json
+Skip (exists): data\cache\inputs_before_algo_block_1768490108821.json
+Skip (exists): data\cache\inputs_before_algo_block_1768490408704.json
+Skip (exists): data\cache\inputs_before_algo_block_1768490708765.json
+Skip (exists): data\cache\inputs_before_algo_block_1768491008647.json
+Skip (exists): data\cache\inputs_before_algo_block_1768491308889.json
+Skip (exists): data\cache\inputs_before_algo_block_1768491668736.json
+Skip (exists): data\cache\inputs_before_algo_block_1768491668736.json
+Skip (exists): data\cache\inputs_before_algo_block_1768491968562.json
+Skip (exists): data\cache\inputs_before_algo_block_1768492268624.json
+Skip (exists): data\cache\inputs_before_algo_block_1768492568506.json
+Skip (exists): data\cache\inputs_before_algo_block_1768492868571.json
+Skip (exists): data\cache\inputs_before_algo_block_1768493168436.json
+Skip (exists): data\cache\inputs_before_algo_block_1768493468510.json
+Skip (exists): data\cache\inputs_before_algo_block_1768493768388.json
+Skip (exists): data\cache\inputs_before_algo_block_1768494068452.json
+Skip (exists): data\cache\inputs_before_algo_block_1768494368336.json
+Skip (exists): data\cache\inputs_before_algo_block_1768494668394.json
+Skip (exists): data\cache\inputs_before_algo_block_1768494968278.json
+Skip (exists): data\cache\inputs_before_algo_block_1768495268337.json
+Skip (exists): data\cache\inputs_before_algo_block_1768495568222.json
+Skip (exists): data\cache\inputs_before_algo_block_1768495870068.json
+Skip (exists): data\cache\inputs_before_algo_block_1768496468218.json
+Skip (exists): data\cache\inputs_before_algo_block_1768496468218.json
+Skip (exists): data\cache\inputs_before_algo_block_1768496768098.json
+Skip (exists): data\cache\inputs_before_algo_block_1768497068159.json
+Skip (exists): data\cache\inputs_before_algo_block_1768497368039.json
+Skip (exists): data\cache\inputs_before_algo_block_1768497668099.json
+Skip (exists): data\cache\inputs_before_algo_block_1768497967981.json
+Skip (exists): data\cache\inputs_before_algo_block_1768498268048.json
+Skip (exists): data\cache\inputs_before_algo_block_1768498567924.json
+Skip (exists): data\cache\inputs_before_algo_block_1768498867993.json
+Skip (exists): data\cache\inputs_before_algo_block_1768499167872.json
+Skip (exists): data\cache\inputs_before_algo_block_1768499467932.json
+Skip (exists): data\cache\inputs_before_algo_block_1768499767814.json
+Skip (exists): data\cache\inputs_before_algo_block_1768500067876.json
+Skip (exists): data\cache\inputs_before_algo_block_1768500367757.json
+Skip (exists): data\cache\inputs_before_algo_block_1768500727759.json
+Skip (exists): data\cache\inputs_before_algo_block_1768501027644.json
+Skip (exists): data\cache\inputs_before_algo_block_1768501507752.json
+Skip (exists): data\cache\inputs_before_algo_block_1768502287519.json
+Skip (exists): data\cache\inputs_before_algo_block_1768502587581.json
+Skip (exists): data\cache\inputs_before_algo_block_1768502887462.json
+Skip (exists): data\cache\inputs_before_algo_block_1768503187518.json
+Skip (exists): data\cache\inputs_before_algo_block_1768503487405.json
+Skip (exists): data\cache\inputs_before_algo_block_1768503787466.json
+Skip (exists): data\cache\inputs_before_algo_block_1768504087347.json
+Skip (exists): data\cache\inputs_before_algo_block_1768504387410.json
+Skip (exists): data\cache\inputs_before_algo_block_1768504687293.json
+Skip (exists): data\cache\inputs_before_algo_block_1768504987353.json
+Skip (exists): data\cache\inputs_before_algo_block_1768505287237.json
+Skip (exists): data\cache\inputs_before_algo_block_1768505587297.json
+Skip (exists): data\cache\inputs_before_algo_block_1768505887178.json
+Skip (exists): data\cache\inputs_before_algo_block_1768506187241.json
+Skip (exists): data\cache\inputs_before_algo_block_1768506487111.json
+Skip (exists): data\cache\inputs_before_algo_block_1768506787198.json
+Skip (exists): data\cache\inputs_before_algo_block_1768507087065.json
+Skip (exists): data\cache\inputs_before_algo_block_1768507387127.json
+Skip (exists): data\cache\inputs_before_algo_block_1768507687008.json
+Skip (exists): data\cache\inputs_before_algo_block_1768507987068.json
+Skip (exists): data\cache\inputs_before_algo_block_1768508286952.json
+Skip (exists): data\cache\inputs_before_algo_block_1768508587014.json
+Skip (exists): data\cache\inputs_before_algo_block_1768508886896.json
+Skip (exists): data\cache\inputs_before_algo_block_1768509186958.json
+Skip (exists): data\cache\inputs_before_algo_block_1768510206827.json
+Skip (exists): data\cache\inputs_before_algo_block_1768510206827.json
+Skip (exists): data\cache\inputs_before_algo_block_1768510506720.json
+
+5) Running project validation...
+
+=== RUN compare_runner ===
+Обработка 244 AutoISF блоков...
+
+
+Отчёт сохранён в: C:\Users\IngPPO1\Desktop\AAPS-Emulator\aaps_emulator\data\reports\compare\summary.json
+
+=== SUMMARY CHECK ===
+Total blocks: 244
+[OK] No mismatches in summary.json
+
+=== CHECK predBG DETAILS ===
+[OK] predBG curves fully match
+
+=== CHECK INPUTS ===
+[OK] All inputs_before_algo_block_* exist
+
+=== FINAL RESULT ===
+[OK] Python emulator FULLY MATCHES AAPS
+
+6) Smoke check first generated JSON...
+Sample file: C:\Users\IngPPO1\Desktop\AAPS-Emulator\data\cache\inputs_before_algo_block_1768425315211.json
+{
+  "inputs": {
+    "glucose_status": {
+      "__type__": "GlucoseStatusAutoIsf",
+      "glucose": 127.0,
+      "noise": 0.0,
+      "delta": 1.0,
+      "shortAvgDelta": 1.04,
+      "longAvgDelta": 0.98,
+      "date": 1768425315211,
+      "bgAcceleration": 0.0,
+      "duraISFminutes": 0.0,
+      "duraISFaverage": 127.0,
+      "parabolaMinutes": 0.0,
+      "deltaPl": 0.0,
+      "deltaPn": 0.0,
+      "a0": 0.0,
+      "a1": 0.0,
+      "a2": 0.0,
+      "corrSqu": 0.0
+    },
+    "current_temp": {
+      "__type__": "CurrentTemp",
+      "duration": 0,
+      "rate": 0.0,
+      "minutesrunning": null
+    },
+    "iob_data_array": [
+      {
+        "__type__": "IobTotal",
+        "time": 1768425333719,
+        "bolussnooze": 0.0,
+        "basaliob": -0.249,
+        "netbasalinsulin": -1.224,
+        "hightempinsulin": 0.583,
+        "netInsulin": -1.224,
+        "extendedBolusInsulin": 0.0
+      }
+    ],
+    "profile": {
+      "__type__": "OapsProfileAutoIsf",
+      "dia": 0.0,
+      "min_5m_carbimpact": 0.0,
+      "max_iob": 10.0,
+      "max_daily_basal": 0.8,
+      "max_basal": 2.0,
+      "min_bg": 115.2,
+      "max_bg": 115.2,
+      "target_bg": 115.2,
+      "carb_ratio": 16.0,
+      "sens": 111.60000000000001,
+      "autosens_adjust_targets": false,
+      "max_daily_safety_multiplier": 3.0,
+      "current_basal_safety_multiplier": 4.0,
+      "high_temptarget_raises_sensitivity": true,
+      "low_temptarget_lowers_sensitivity": true,
+      "sensitivity_raises_target": true,
+      "resistance_lowers_target": true,
+      "adv_target_adjustments": false,
+      "exercise_mode": false,
+      "half_basal_exercise_target": 160,
+      "maxCOB": 120,
+      "skip_neutral_temps": false,
+      "remainingCarbsCap": 90,
+      "enableUAM": true,
+      "A52_risk_enable": false,
+      "SMBInterval": 5,
+      "enableSMB_with_COB": true,
+      "enableSMB_with_temptarget": true,
+      "allowSMB_with_high_temptarget": false,
+      "enableSMB_always": true,
+      "enableSMB_after_carbs": true,
+      "maxSMBBasalMinutes": 90,
+      "maxUAMSMBBasalMinutes": 60,
+      "bolus_increment": 0.1,
+      "carbsReqThreshold": 1,
+      "current_basal": 0.5,
+      "temptargetSet": false,
+      "autosens_max": 1.2,
+      "out_units": "mmol/L",
+
+All checks passed.
+**********************
+PowerShell transcript end
+End time: 20260326143224
+**********************

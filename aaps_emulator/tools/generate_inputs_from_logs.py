@@ -7,7 +7,9 @@ import glob
 from aaps_emulator.runner.build_inputs import build_inputs_from_block
 from aaps_emulator.runner.load_logs import load_logs
 
-OUT_DIR = Path("data/cache")
+ROOT = Path(__file__).resolve().parents[2]
+DATA = ROOT / "data"
+OUT_DIR = DATA / "cache"
 
 
 def save_inputs_from_block(block, out_dir: Path):
@@ -95,7 +97,7 @@ def main():
     args = parser.parse_args()
 
     # выбрать значение аргумента: позиционный > --logs > дефолт
-    logs_arg = args.logs if args.logs is not None else (args.logs_opt if args.logs_opt is not None else "data/logs")
+    logs_arg = args.logs if args.logs is not None else (args.logs_opt if args.logs_opt is not None else str(DATA / "logs"))
 
     logs_path = Path(logs_arg)
     blocks = []

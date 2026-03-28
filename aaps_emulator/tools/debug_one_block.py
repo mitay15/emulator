@@ -519,7 +519,10 @@ def process_file(path: Path) -> Dict[str, Any]:
             if isinstance(block_objs, dict):
                 block_objs = [block_objs]
     except Exception as e:
-        err_path = Path("aaps_emulator/data/cache/parsed_block_on_error.json")
+        ROOT = Path(__file__).resolve().parents[2]
+        DATA = ROOT / "data"
+        err_path = DATA / "cache" / "parsed_block_on_error.json"
+
         err_path.parent.mkdir(parents=True, exist_ok=True)
         err_path.write_text(
             json.dumps(dump, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -553,7 +556,7 @@ def process_file(path: Path) -> Dict[str, Any]:
         }
         return report_meta
     except Exception as e:
-        err_inputs_path = Path("data/cache/failed_inputs_for_pipeline.json")
+        err_inputs_path = DATA / "cache" / "failed_inputs_for_pipeline.json"
         err_inputs_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             err_inputs_path.write_text(

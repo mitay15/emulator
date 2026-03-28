@@ -7,11 +7,12 @@ import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
 
-ROOT = Path(__file__).parent.parent
+ROOT = Path(__file__).resolve().parents[2]
+DATA = ROOT / "data"
 
-SUMMARY_PATH = ROOT / "data" / "reports" / "compare" / "summary.json"
-CACHE_DIR = ROOT / "data" / "cache"
-OUT_HTML = ROOT / "data" / "reports" / "html" / "parity_report_interactive.html"
+SUMMARY_PATH = DATA / "reports" / "compare" / "summary.json"
+CACHE_DIR = DATA / "cache"
+OUT_HTML = DATA / "reports" / "html" / "parity_report_interactive.html"
 
 # Поля для сравнения: (json_key_prefix, label)
 FIELDS = [

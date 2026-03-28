@@ -9,13 +9,14 @@ from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, Dict, List
 
 from aaps_emulator.core.autoisf_pipeline import run_autoisf_pipeline
 from aaps_emulator.runner.build_inputs import build_inputs_from_block
 from aaps_emulator.runner.load_logs import load_logs
 
 logger = logging.getLogger("autoisf")
-logging.getLogger("autoisf").setLevel(logging.WARNING)
+logger.setLevel(logging.WARNING)
 
 
 class C:
@@ -26,7 +27,7 @@ class C:
     END = "\033[0m"
 
 
-def _extract_aaps_result_from_objs(objs):
+def _extract_aaps_result_from_objs(objs: Any) -> Dict[str, Any]:
     if isinstance(objs, dict) and objs.get("__type__") == "RT":
         return objs
     if isinstance(objs, list):
@@ -40,7 +41,7 @@ def _extract_aaps_result_from_objs(objs):
     return {}
 
 
-def _progress_bar(current, total, start_time, bar_len=40):
+def _progress_bar(current: int, total: int, start_time: float, bar_len: int = 40) -> None:
     elapsed = time.time() - start_time
     rate = current / elapsed if elapsed > 0 else 0
     eta = (total - current) / rate if rate > 0 else 0
@@ -56,7 +57,7 @@ def _progress_bar(current, total, start_time, bar_len=40):
     )
 
 
-def _serialize(obj):
+def _serialize(obj: Any) -> Any:
     try:
         if obj is None:
             return None
@@ -75,9 +76,9 @@ def _serialize(obj):
         return str(obj)
 
 
-def _dump_error_block(idx, block_objs, exc, stage):
+def _dump_error_block(idx: int, block_objs: Any, exc: Exception, stage: str) -> None:
     try:
-        cache_dir = Path(__file__).parent.parent / "data" / "cache"
+        cache_dir = Path(__file__).resolve().parents[2] / "data" / "cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         out = cache_dir / f"error_block_{stage}_{idx}.json"
@@ -94,7 +95,6 @@ def _dump_error_block(idx, block_objs, exc, stage):
                 indent=2,
             )
         logger.error(f"Сохранён дамп ошибки: {out}")
-
     except Exception as e:
         logger.error(f"Не удалось сохранить дамп ошибки: {e}")
 
@@ -111,7 +111,6 @@ def compute_metrics(aaps_list, py_list):
             diffs.append(float(b) - float(a))
 
     clean = [abs(d) for d in diffs if d is not None]
-
     if not clean:
         return {"mae": 0.0, "rmse": 0.0, "max_diff": 0.0, "diffs": diffs}
 
@@ -141,9 +140,14 @@ def is_fallback_rt(aaps_rt: dict) -> bool:
     return False
 
 
-# ============================================================
-#   ОБРАБОТКА БЛОКОВ
-# ============================================================
+def _cmp(a, b, tol=0.5) -> bool:
+    if a is None or b is None:
+        return False
+    try:
+        return abs(float(a) - float(b)) > tol
+    except Exception:
+        return a != b
+
 
 def _process_blocks(blocks, fast, return_stats, extract_clean):
     mismatch_stats = {
@@ -164,12 +168,13 @@ def _process_blocks(blocks, fast, return_stats, extract_clean):
     total = len(blocks)
     test_mode = return_stats
 
-    for local_idx, block_objs in enumerate(blocks, start=1):
+    clean_dir = None
+    if extract_clean:
+        clean_dir = Path(__file__).resolve().parents[2] / "data" / "clean"
+        clean_dir.mkdir(parents=True, exist_ok=True)
 
-        # extract-clean работает только в normal‑режиме
-        if extract_clean:
-            clean_dir = Path(__file__).parent.parent / "data" / "clean"
-            clean_dir.mkdir(parents=True, exist_ok=True)
+    for local_idx, block_objs in enumerate(blocks, start=1):
+        if extract_clean and clean_dir is not None:
             clean_path = clean_dir / f"block_{local_idx:05d}.json"
             with clean_path.open("w", encoding="utf-8") as f:
                 json.dump(block_objs, f, ensure_ascii=False, indent=2)
@@ -244,35 +249,20 @@ def _process_blocks(blocks, fast, return_stats, extract_clean):
 
         pred_metrics = compute_metrics(aaps_pred_list, py_pred_list)
 
-        def _cmp(a, b, tol=0.5):
-            if a is None or b is None:
-                return False
-            try:
-                return abs(float(a) - float(b)) > tol
-            except Exception:
-                return a != b
-
         if _cmp(aaps_eventual, py_eventual):
             mismatch_stats["eventualBG"] += 1
-
         if _cmp(aaps_var_sens, py_var_sens, tol=0.01):
             mismatch_stats["variable_sens"] += 1
-
         if _cmp(aaps_min_pred, py_min_pred):
             mismatch_stats["min_pred_bg"] += 1
-
         if _cmp(aaps_min_guard, py_min_guard):
             mismatch_stats["min_guard_bg"] += 1
-
         if _cmp(aaps_insulinReq, py_insulinReq):
             mismatch_stats["insulinReq"] += 1
-
         if _cmp(aaps_rate, py_rate):
             mismatch_stats["rate"] += 1
-
         if _cmp(aaps_duration, py_duration):
             mismatch_stats["duration"] += 1
-
         if _cmp(aaps_smb, py_smb):
             mismatch_stats["smb"] += 1
 
@@ -322,12 +312,7 @@ def _process_blocks(blocks, fast, return_stats, extract_clean):
     return ns_results
 
 
-# ============================================================
-#   NORMAL MODE
-# ============================================================
-
 def compare_logs(paths=None, fast=False, return_stats=False, extract_clean=False):
-
     # CLEAN MODE
     if paths and all(str(p).endswith(".json") and "block_" in str(p) for p in paths):
         blocks = []
@@ -345,14 +330,14 @@ def compare_logs(paths=None, fast=False, return_stats=False, extract_clean=False
 
     # NORMAL MODE
     if not paths:
-        default_dir = Path(__file__).parent.parent / "data" / "logs"
+        default_dir = Path(__file__).resolve().parents[2] / "data" / "logs"
         paths = (
             list(default_dir.rglob("*.json"))
             + list(default_dir.rglob("*.zip"))
             + list(default_dir.rglob("*.log"))
         )
 
-    all_parsed = []
+    all_parsed: List[Dict[str, Any]] = []
     for p in paths:
         parsed = load_logs(p)
         for obj in parsed:
@@ -360,9 +345,28 @@ def compare_logs(paths=None, fast=False, return_stats=False, extract_clean=False
                 obj["_log_path"] = str(p)
         all_parsed.extend(parsed)
 
-    blocks = []
+    blocks: List[List[Dict[str, Any]]] = []
     i = 0
     n = len(all_parsed)
+
+    # DEBUG
+    print("DEBUG: total parsed objects:", n)
+    print(
+        "DEBUG: GlucoseStatusAutoIsf count:",
+        sum(
+            1
+            for o in all_parsed
+            if isinstance(o, dict) and o.get("__type__") == "GlucoseStatusAutoIsf"
+        ),
+    )
+    print(
+        "DEBUG: RT count:",
+        sum(
+            1
+            for o in all_parsed
+            if isinstance(o, dict) and o.get("__type__") == "RT"
+        ),
+    )
 
     while i < n:
         obj = all_parsed[i]
@@ -386,10 +390,6 @@ def compare_logs(paths=None, fast=False, return_stats=False, extract_clean=False
     return _process_blocks(blocks, fast, return_stats, extract_clean)
 
 
-# ============================================================
-#   CLI
-# ============================================================
-
 if __name__ == "__main__":
     import argparse
 
@@ -400,29 +400,25 @@ if __name__ == "__main__":
     parser.add_argument("--extract-clean", action="store_true")
     args = parser.parse_args()
 
-    # Resolve paths
     paths = None
 
     if args.log:
         p = Path(args.log)
         if p.is_dir():
-            # clean mode
             clean_files = sorted(p.glob("block_*.json"))
             if clean_files:
                 paths = clean_files
             else:
-                # normal mode: load all logs from directory
                 paths = (
                     list(p.rglob("*.json"))
                     + list(p.rglob("*.zip"))
                     + list(p.rglob("*.log"))
                 )
         else:
-            # single file
             paths = [p]
 
     if paths is None:
-        default_dir = Path(__file__).parent.parent / "data" / "logs"
+        default_dir = Path(__file__).resolve().parents[2] / "data" / "logs"
         paths = (
             list(default_dir.rglob("*.json"))
             + list(default_dir.rglob("*.zip"))
@@ -436,9 +432,8 @@ if __name__ == "__main__":
         extract_clean=args.extract_clean,
     )
 
-    # SAVE REPORT
     if args.report:
-        report_dir = Path(__file__).parent.parent / "data" / "reports" / "compare"
+        report_dir = Path(__file__).resolve().parents[2] / "data" / "reports" / "compare"
         report_dir.mkdir(parents=True, exist_ok=True)
 
         out = report_dir / "summary.json"
@@ -446,4 +441,3 @@ if __name__ == "__main__":
             json.dump(result, f, ensure_ascii=False, indent=2)
 
         print(f"\nОтчёт сохранён в: {out}")
-

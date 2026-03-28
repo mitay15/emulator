@@ -19,6 +19,9 @@ from aaps_emulator.core.predictions import PredictionsResult, run_predictions
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------
+# НОРМАЛИЗАЦИЯ ВХОДОВ
+# ---------------------------------------------------------
 def _ensure_dataclass(value, cls):
     if value is None or isinstance(value, cls):
         return value
@@ -27,129 +30,115 @@ def _ensure_dataclass(value, cls):
     return value
 
 
+def _normalize_glucose_status(gs: GlucoseStatusAutoIsf | None):
+    if not gs:
+        return gs
+    for field in [
+        "glucose",
+        "delta",
+        "shortAvgDelta",
+        "longAvgDelta",
+        "bgAcceleration",
+        "corrSqu",
+        "duraISFminutes",
+        "duraISFaverage",
+    ]:
+        val = getattr(gs, field, None)
+        if isinstance(val, str):
+            try:
+                setattr(gs, field, float(val))
+            except Exception:
+                setattr(gs, field, 0.0)
+    return gs
+
+
+def _normalize_profile(profile):
+    if profile is None:
+        return None
+
+    # Если профиль — список, берём первый
+    if isinstance(profile, list) and profile:
+        profile = profile[0]
+
+    # Если профиль — {"profile": {...}}
+    if isinstance(profile, dict) and "profile" in profile:
+        profile = profile["profile"]
+
+    # Если профиль — dict → маппим в OapsProfileAutoIsf
+    if isinstance(profile, dict):
+        mapped = {
+            "min_bg": profile.get("min_bg", profile.get("minBg")),
+            "max_bg": profile.get("max_bg", profile.get("maxBg")),
+            "target_bg": profile.get("target_bg"),
+            "current_basal": profile.get("current_basal", profile.get("currentBasal")),
+            "max_basal": profile.get("max_basal", profile.get("maxBasal")),
+            "max_daily_basal": profile.get("max_daily_basal", profile.get("maxDailyBasal")),
+            "max_daily_safety_multiplier": profile.get("max_daily_safety_multiplier"),
+            "current_basal_safety_multiplier": profile.get("current_basal_safety_multiplier"),
+            "sens": profile.get("sens", profile.get("isf")),
+            "autosens_max": profile.get("autosens_max"),
+            "autosens_min": profile.get("autosens_min"),
+            "enable_autoISF": profile.get("enable_autoISF", True),
+            "autoISF_min": profile.get("autoISF_min"),
+            "autoISF_max": profile.get("autoISF_max"),
+            "autoISF_version": profile.get("autoISF_version"),
+            "bgAccel_ISF_weight": profile.get("bgAccel_ISF_weight"),
+            "bgBrake_ISF_weight": profile.get("bgBrake_ISF_weight"),
+            "pp_ISF_weight": profile.get("pp_ISF_weight"),
+            "dura_ISF_weight": profile.get("dura_ISF_weight"),
+            "lower_ISFrange_weight": profile.get("lower_ISFrange_weight"),
+            "higher_ISFrange_weight": profile.get("higher_ISFrange_weight"),
+            "carb_ratio": profile.get("carb_ratio", profile.get("ic")),
+            "smb_delivery_ratio": profile.get("smb_delivery_ratio"),
+            "smb_delivery_ratio_min": profile.get("smb_delivery_ratio_min"),
+            "smb_delivery_ratio_max": profile.get("smb_delivery_ratio_max"),
+            "bolus_increment": profile.get("bolus_increment"),
+            "maxSMBBasalMinutes": profile.get("maxSMBBasalMinutes"),
+            "maxUAMSMBBasalMinutes": profile.get("maxUAMSMBBasalMinutes"),
+            "enableUAM": profile.get("enableUAM", False),
+            "high_temptarget_raises_sensitivity": profile.get("high_temptarget_raises_sensitivity", False),
+            "low_temptarget_lowers_sensitivity": profile.get("low_temptarget_lowers_sensitivity", False),
+            "lgsThreshold": profile.get("lgsThreshold"),
+            "max_iob": profile.get("max_iob"),
+            "iob_threshold_percent": profile.get("iob_threshold_percent"),
+            "half_basal_exercise_target": profile.get("half_basal_exercise_target"),
+        }
+
+        mapped_clean = {k: v for k, v in mapped.items() if v is not None}
+        mapped_clean["raw"] = profile
+        return OapsProfileAutoIsf(**mapped_clean)
+
+    return profile
+
+
 def _normalize_inputs(inputs: AutoIsfInputs) -> AutoIsfInputs:
-    # --- базовая нормализация dataclass ---
-    inputs.glucose_status = _ensure_dataclass(
-        inputs.glucose_status, GlucoseStatusAutoIsf
-    )
+    inputs.glucose_status = _ensure_dataclass(inputs.glucose_status, GlucoseStatusAutoIsf)
     inputs.profile = _ensure_dataclass(inputs.profile, OapsProfileAutoIsf)
     inputs.autosens = _ensure_dataclass(inputs.autosens, AutosensResult)
     inputs.meal = _ensure_dataclass(inputs.meal, MealData)
     inputs.current_temp = _ensure_dataclass(inputs.current_temp, TempBasal)
 
-    # --- нормализация массива IOB ---
     if inputs.iob_data_array and isinstance(inputs.iob_data_array[0], dict):
         inputs.iob_data_array = [
             _ensure_dataclass(x, IobTotal) for x in inputs.iob_data_array
         ]
 
-    # --- нормализация числовых полей GlucoseStatusAutoIsf ---
-    gs = inputs.glucose_status
-    if gs:
-        for field in [
-            "glucose",
-            "delta",
-            "shortAvgDelta",
-            "longAvgDelta",
-            "bgAcceleration",
-            "corrSqu",
-            "duraISFminutes",
-            "duraISFaverage",
-        ]:
-            val = getattr(gs, field, None)
-            if isinstance(val, str):
-                try:
-                    setattr(gs, field, float(val))
-                except Exception:
-                    setattr(gs, field, 0.0)
-
-    # --- нормализация autosens ---
-    if inputs.autosens and isinstance(inputs.autosens.ratio, str):
-        try:
-            inputs.autosens.ratio = float(inputs.autosens.ratio)
-        except Exception:
-            inputs.autosens.ratio = 1.0
-
-    # --- Нормализация профиля из legacy AAPS-форматов ---
-    prof = inputs.profile
-
-    # Если профиль — список, берём первый элемент
-    if isinstance(prof, list) and prof:
-        prof = prof[0]
-
-    # Если профиль — вложенный dict вида {"profile": {...}}
-    if isinstance(prof, dict) and "profile" in prof:
-        prof = prof["profile"]
-
-    # Если профиль — dict → маппим в OapsProfileAutoIsf
-    if isinstance(prof, dict):
-        mapped = {
-            "min_bg": prof.get("min_bg", prof.get("minBg")),
-            "max_bg": prof.get("max_bg", prof.get("maxBg")),
-            "target_bg": prof.get("target_bg", prof.get("target_bg")),
-            "current_basal": prof.get("current_basal", prof.get("currentBasal")),
-            "max_basal": prof.get("max_basal", prof.get("maxBasal")),
-            "max_daily_basal": prof.get("max_daily_basal", prof.get("maxDailyBasal")),
-            "max_daily_safety_multiplier": prof.get("max_daily_safety_multiplier"),
-            "current_basal_safety_multiplier": prof.get(
-                "current_basal_safety_multiplier"
-            ),
-            "sens": prof.get("sens", prof.get("isf")),
-            "autosens_max": prof.get("autosens_max"),
-            "autosens_min": prof.get("autosens_min"),
-            "enable_autoISF": prof.get("enable_autoISF", True),
-            "autoISF_min": prof.get("autoISF_min"),
-            "autoISF_max": prof.get("autoISF_max"),
-            "autoISF_version": prof.get("autoISF_version"),
-
-            # --- веса AutoISF ---
-            "bgAccel_ISF_weight": prof.get("bgAccel_ISF_weight"),
-            "bgBrake_ISF_weight": prof.get("bgBrake_ISF_weight"),
-            "pp_ISF_weight": prof.get("pp_ISF_weight"),
-            "dura_ISF_weight": prof.get("dura_ISF_weight"),
-            "lower_ISFrange_weight": prof.get("lower_ISFrange_weight"),
-            "higher_ISFrange_weight": prof.get("higher_ISFrange_weight"),
-
-            # --- карбы / SMB ---
-            "carb_ratio": prof.get("carb_ratio", prof.get("ic")),
-            "smb_delivery_ratio": prof.get("smb_delivery_ratio"),
-            "smb_delivery_ratio_min": prof.get("smb_delivery_ratio_min"),
-            "smb_delivery_ratio_max": prof.get("smb_delivery_ratio_max"),
-            "bolus_increment": prof.get("bolus_increment"),
-            "maxSMBBasalMinutes": prof.get("maxSMBBasalMinutes"),
-            "maxUAMSMBBasalMinutes": prof.get("maxUAMSMBBasalMinutes"),
-
-            # --- флаги ---
-            "enableUAM": prof.get("enableUAM", False),
-            "high_temptarget_raises_sensitivity": prof.get(
-                "high_temptarget_raises_sensitivity", False
-            ),
-            "low_temptarget_lowers_sensitivity": prof.get(
-                "low_temptarget_lowers_sensitivity", False
-            ),
-
-            # --- safety ---
-            "lgsThreshold": prof.get("lgsThreshold"),
-            "max_iob": prof.get("max_iob"),
-            "iob_threshold_percent": prof.get("iob_threshold_percent"),
-        }
-
-        mapped_clean = {k: v for k, v in mapped.items() if v is not None}
-        mapped_clean["raw"] = prof
-
-        inputs.profile = OapsProfileAutoIsf(**mapped_clean)
+    inputs.glucose_status = _normalize_glucose_status(inputs.glucose_status)
+    inputs.profile = _normalize_profile(inputs.profile)
 
     return inputs
 
 
+# ---------------------------------------------------------
+# ОСНОВНОЙ ПАЙПЛАЙН AUTOISF
+# ---------------------------------------------------------
 def run_autoisf_pipeline(inputs: AutoIsfInputs):
     inputs = _normalize_inputs(inputs)
 
-    # --- базовые ссылки ---
     p = inputs.profile
     gs = inputs.glucose_status
 
-    # --- fallback профиль, если его нет (нужно для clean-блоков и smoke-тестов) ---
+    # fallback профиль
     if p is None:
         p = OapsProfileAutoIsf(
             min_bg=90,
@@ -162,24 +151,20 @@ def run_autoisf_pipeline(inputs: AutoIsfInputs):
         )
         inputs.profile = p
 
-    # --- autosens_ratio (как в AAPS) ---
+    # autosens_ratio
     autosens_ratio = inputs.autosens.ratio if inputs.autosens else 1.0
-    if p and p.autosens_max is not None:
+    if p.autosens_max is not None:
         autosens_ratio = min(autosens_ratio, p.autosens_max)
-
-    if p and getattr(p, "autosens_min", None) is not None:
+    if p.autosens_min is not None:
         autosens_ratio = max(autosens_ratio, p.autosens_min)
 
-    # --- Temp Targets (AAPS 3.4) ---
+    # Temp Targets
     tt = None
-    if getattr(inputs, "raw_block", None):
-        tt = None
-        rb = inputs.raw_block
-
-        if isinstance(rb, dict):
-            tt = rb.get("temptarget")
-        elif isinstance(rb, list) and len(rb) > 0 and isinstance(rb[0], dict):
-            tt = rb[0].get("temptarget")
+    rb = inputs.raw_block
+    if isinstance(rb, dict):
+        tt = rb.get("temptarget")
+    elif isinstance(rb, list) and rb and isinstance(rb[0], dict):
+        tt = rb[0].get("temptarget")
 
     if tt and tt.get("duration", 0) > 0:
         isTempTarget = True
@@ -193,13 +178,13 @@ def run_autoisf_pipeline(inputs: AutoIsfInputs):
             (p.min_bg + p.max_bg) / 2.0 if p.min_bg and p.max_bg else None
         )
 
-    # normalTarget — обычная цель профиля
-    if p.min_bg is not None and p.max_bg is not None:
-        normalTarget = (p.min_bg + p.max_bg) / 2.0
-    else:
-        normalTarget = target_bg
+    normalTarget = (
+        (p.min_bg + p.max_bg) / 2.0
+        if p.min_bg is not None and p.max_bg is not None
+        else target_bg
+    )
 
-    # --- дефолты для AutoISF параметров ---
+    # AutoISF параметры
     autoISF_min = p.autoISF_min if p.autoISF_min is not None else 0.5
     autoISF_max = p.autoISF_max if p.autoISF_max is not None else 2.0
 
@@ -207,25 +192,13 @@ def run_autoisf_pipeline(inputs: AutoIsfInputs):
     bgBrake_weight = p.bgBrake_ISF_weight if p.bgBrake_ISF_weight is not None else 0.01
     pp_weight = p.pp_ISF_weight if p.pp_ISF_weight is not None else 0.01
     dura_weight = p.dura_ISF_weight if p.dura_ISF_weight is not None else 0.01
-    lower_range_weight = (
-        p.lower_ISFrange_weight if p.lower_ISFrange_weight is not None else 0.0
-    )
-    higher_range_weight = (
-        p.higher_ISFrange_weight if p.higher_ISFrange_weight is not None else 0.0
-    )
+    lower_range_weight = p.lower_ISFrange_weight or 0.0
+    higher_range_weight = p.higher_ISFrange_weight or 0.0
 
-    high_temptarget_raises_sensitivity = (
-        p.high_temptarget_raises_sensitivity
-        if p.high_temptarget_raises_sensitivity is not None
-        else True
-    )
-    low_temptarget_lowers_sensitivity = (
-        p.low_temptarget_lowers_sensitivity
-        if p.low_temptarget_lowers_sensitivity is not None
-        else True
-    )
+    high_tt = p.high_temptarget_raises_sensitivity if p.high_temptarget_raises_sensitivity is not None else True
+    low_tt = p.low_temptarget_lowers_sensitivity if p.low_temptarget_lowers_sensitivity is not None else True
 
-    # --- вызов полного AutoISF (как в AAPS 3.4) ---
+    # полный AutoISF
     variable_sens = compute_variable_sens(
         p,
         gs,
@@ -241,98 +214,53 @@ def run_autoisf_pipeline(inputs: AutoIsfInputs):
         target_bg,
         normalTarget,
         isTempTarget,
-        high_temptarget_raises_sensitivity,
-        low_temptarget_lowers_sensitivity,
+        high_tt,
+        low_tt,
     )
 
-    # --- safe variable_sens fallback and debug logging ---
+    # fallback variable_sens
     try:
-        _vs = variable_sens
-    except NameError:
-        _vs = None
-
-    try:
-        if _vs is None or float(_vs) <= 0:
-            _autosens = getattr(inputs, "autosens", None)
-            _autosens_ratio = (
-                getattr(_autosens, "ratio", None) if _autosens is not None else None
-            )
-            if _autosens_ratio is not None and float(_autosens_ratio) > 0:
-                variable_sens = float(_autosens_ratio)
+        if variable_sens is None or float(variable_sens) <= 0:
+            if inputs.autosens and inputs.autosens.ratio and float(inputs.autosens.ratio) > 0:
+                variable_sens = float(inputs.autosens.ratio)
             else:
-                _prof_sens = getattr(inputs.profile, "sens", None)
-                try:
-                    variable_sens = (
-                        float(_prof_sens)
-                        if _prof_sens is not None and float(_prof_sens) > 0
-                        else 1.0
-                    )
-                except Exception:
-                    variable_sens = 1.0
+                base = getattr(inputs.profile, "sens", None)
+                variable_sens = float(base) if base and float(base) > 0 else 1.0
         else:
-            variable_sens = float(_vs)
+            variable_sens = float(variable_sens)
     except Exception:
         variable_sens = 1.0
-
-    try:
-        _autosens_for_log = getattr(inputs, "autosens", None)
-        _autosens_ratio_for_log = (
-            getattr(_autosens_for_log, "ratio", None)
-            if _autosens_for_log is not None
-            else None
-        )
-        _prof_sens_for_log = getattr(inputs.profile, "sens", None)
-        logger.debug(
-            "variable_sens resolved to %s (computed=%s, autosens=%s, profile.sens=%s)",
-            variable_sens,
-            _vs,
-            _autosens_ratio_for_log,
-            _prof_sens_for_log,
-        )
-    except Exception:
-        pass
 
     try:
         inputs.profile.variable_sens = variable_sens
     except Exception:
         pass
 
+    # предсказания
     pred: PredictionsResult = run_predictions(inputs)
 
-    # --- НОРМАЛИЗАЦИЯ ПРЕДСКАЗАНИЙ В AAPS-ФОРМАТ ---
+    # нормализация predBGs
     try:
         predBGs = {}
-        if hasattr(pred, "pred_iob") and pred.pred_iob is not None:
+        if pred.pred_iob is not None:
             predBGs["IOB"] = list(pred.pred_iob)
-        if hasattr(pred, "pred_uam") and pred.pred_uam is not None:
+        if pred.pred_uam is not None:
             predBGs["UAM"] = list(pred.pred_uam)
-        if hasattr(pred, "pred_zt") and pred.pred_zt is not None:
+        if pred.pred_zt is not None:
             predBGs["ZT"] = list(pred.pred_zt)
         if predBGs:
             pred.predBGs = predBGs
     except Exception:
-        # не ломаем пайплайн из-за интерфейсной обвязки
         pass
-    # --- КОНЕЦ НОРМАЛИЗАЦИИ ---
 
+    # determine_basal
     dosing: DosingResult = run_determine_basal(
         inputs=inputs,
         pred=pred,
         variable_sens=variable_sens,
     )
 
-    # ensure eventualBG override compatibility
-    try:
-        dbg = getattr(pred, "autoisf_debug_check", {}) or {}
-        if isinstance(dbg, dict):
-            if "eventualBG" in dbg:
-                pred.eventual_bg = dbg["eventualBG"]
-            elif "eventual_bg" in dbg:
-                pred.eventual_bg = dbg["eventual_bg"]
-    except Exception:
-        pass
-
-    # --- AAPS-style aliases for tests and RT compatibility ---
+    # AAPS-style aliases
     try:
         pred.eventualBG = getattr(pred, "eventual_bg", None)
         pred.minPredBG = getattr(pred, "min_pred_bg", None)
@@ -341,4 +269,3 @@ def run_autoisf_pipeline(inputs: AutoIsfInputs):
         pass
 
     return variable_sens, pred, dosing
-

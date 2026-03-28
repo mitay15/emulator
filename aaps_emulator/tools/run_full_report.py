@@ -11,24 +11,14 @@ import subprocess
 
 from aaps_emulator.tools import plot_predbg_diff as plot_mod
 
-ROOT = Path(__file__).parent.parent
-LOG_FILE = ROOT / "data" / "reports" / "full_report.log"
+ROOT = Path(__file__).resolve().parents[2]
+DATA = ROOT / "data"
+LOG_FILE = DATA / "reports" / "full_report.log"
 
 if importlib.util.find_spec("plotly") is None:
     print("\nERROR: Plotly is not installed.")
     print("Install it with: pip install plotly")
     raise SystemExit
-
-# --- Auto-check for Plotly ---
-try:
-    pass
-except ImportError:
-    print("\nERROR: Plotly is not installed.")
-    print("Install it with:\n")
-    print("    pip install plotly==5.22.0\n")
-    print("Or install all dependencies:\n")
-    print("    pip install -r requirements.txt\n")
-    exit(1)
 
 
 def log(msg: str):

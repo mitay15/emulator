@@ -16,82 +16,82 @@ class BucketedEntry:
     filledGap: bool = False
 
 
-def compute_glucose_status_autoisf(
-    data: List[BucketedEntry],
-) -> Optional[GlucoseStatusAutoIsf]:
+# ---------------------------------------------------------
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ---------------------------------------------------------
+def _is_valid_entry(e: BucketedEntry) -> bool:
+    """Проверка, что точка пригодна для анализа."""
+    try:
+        if e.filledGap:
+            return False
+        if e.recalculated is None or math.isnan(e.recalculated):
+            return False
+        if e.recalculated <= 39:
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def _minutes_between(ts_new: int, ts_old: int) -> float:
+    return (ts_new - ts_old) / 60000.0
+
+
+# ---------------------------------------------------------
+# DURA‑ISF
+# ---------------------------------------------------------
+def compute_dura_isf(data: List[BucketedEntry], now_ts: int):
     """
-    Port of AAPS GlucoseStatusCalculatorAutoIsf.
-    data: list newest->oldest (index 0 is newest)
+    Полная логика DURA‑ISF из AAPS.
+    Возвращает (minutes, average).
     """
-    if not data:
-        return None
-
-    now = data[0]
-    now_ts = now.timestamp
-
-    if len(data) == 1:
-        return GlucoseStatusAutoIsf(
-            glucose=now.recalculated,
-            delta=0.0,
-            shortAvgDelta=0.0,
-            longAvgDelta=0.0,
-            date=now_ts,
-            duraISFminutes=0.0,
-            duraISFaverage=now.value,
-            parabolaMinutes=0.0,
-            deltaPl=0.0,
-            deltaPn=0.0,
-            bgAcceleration=0.0,
-            a0=now.value,
-            a1=0.0,
-            a2=0.0,
-            corrSqu=0.0,
-        )
-
-    # DURA-ISF
     bw = 0.05
-    sum_bg = now.recalculated
+    sum_bg = data[0].recalculated
     old_avg = sum_bg
     minutes_dur = 0
     n = 1
 
     for i in range(1, len(data)):
         e = data[i]
-        if e.value <= 39 or e.filledGap:
+        if not _is_valid_entry(e):
             continue
-        n += 1
-        dt_min = int((now_ts - e.timestamp) / 60000)
+
+        dt_min = int(_minutes_between(now_ts, e.timestamp))
         if dt_min - minutes_dur > 13:
             break
+
         if old_avg * (1 - bw) < e.recalculated < old_avg * (1 + bw):
+            n += 1
             sum_bg += e.recalculated
             old_avg = sum_bg / n
             minutes_dur = dt_min
         else:
             break
 
-    duraISFminutes = float(minutes_dur)
-    duraISFaverage = old_avg
+    return float(minutes_dur), old_avg
 
-    # Parabola regression
+
+# ---------------------------------------------------------
+# ПАРАБОЛИЧЕСКАЯ РЕГРЕССИЯ
+# ---------------------------------------------------------
+def compute_parabola_regression(data: List[BucketedEntry], now_ts: int):
+    """
+    Полная параболическая регрессия AAPS.
+    Возвращает словарь с a0, a1, a2, duraP, deltaPl, deltaPn, bgAcc, corr.
+    """
     if len(data) < 4:
+        # fallback — как в AAPS
         delta = data[0].recalculated - data[1].recalculated
-        return GlucoseStatusAutoIsf(
-            glucose=now.recalculated,
-            delta=delta,
-            shortAvgDelta=delta,
-            longAvgDelta=delta,
-            date=now_ts,
-            duraISFminutes=duraISFminutes,
-            duraISFaverage=duraISFaverage,
-            parabolaMinutes=0.0,
-            deltaPl=0.0,
-            deltaPn=0.0,
-            bgAcceleration=0.0,
-            a0=now.recalculated,
+        return dict(
+            a0=data[0].recalculated,
             a1=0.0,
             a2=0.0,
-            corrSqu=0.0,
+            duraP=0.0,
+            deltaPl=0.0,
+            deltaPn=0.0,
+            bgAcc=0.0,
+            corr=0.0,
+            delta=delta,
         )
 
     scale_time = 300.0
@@ -106,19 +106,23 @@ def compute_glucose_status_autoisf(
 
     n = 0
     eps = 1e-12
+
     for i, e in enumerate(data):
-        if e.recalculated <= 39 or e.filledGap:
+        if not _is_valid_entry(e):
             continue
+
         n += 1
-        # compute normalized time relative to time0
         ti = (e.timestamp - time0) / 1000.0 / scale_time
-        age_min = (time0 - e.timestamp) / 60000.0
+        age_min = _minutes_between(time0, e.timestamp)
+
         if age_min > 47 * 60:
             break
         if ti < ti_last - 11 * 60 / scale_time:
             break
+
         ti_last = ti
         bg = e.recalculated / scale_bg
+
         sx += ti
         sy += bg
         sx2 += ti**2
@@ -164,7 +168,7 @@ def compute_glucose_status_autoisf(
 
         for j in range(i + 1):
             ej = data[j]
-            if ej.recalculated <= 39 or ej.filledGap:
+            if not _is_valid_entry(ej):
                 continue
             dt = (ej.timestamp - time0) / 1000.0 / scale_time
             bgj = a * dt**2 + b * dt + c
@@ -193,27 +197,45 @@ def compute_glucose_status_autoisf(
                 bgAcc=bgAcc,
             )
 
-    if corr_max == 0.0:
-        best["a0"] = now.recalculated
-        best["a1"] = 0.0
-        best["a2"] = 0.0
-
     delta = data[0].recalculated - data[1].recalculated
+    best["corr"] = corr_max
+    best["delta"] = delta
+    return best
+
+
+# ---------------------------------------------------------
+# ОСНОВНАЯ ФУНКЦИЯ
+# ---------------------------------------------------------
+def compute_glucose_status_autoisf(
+    data: List[BucketedEntry],
+) -> Optional[GlucoseStatusAutoIsf]:
+
+    if not data:
+        return None
+
+    now = data[0]
+    now_ts = now.timestamp
+
+    # DURA‑ISF
+    dura_minutes, dura_avg = compute_dura_isf(data, now_ts)
+
+    # Параболическая регрессия
+    reg = compute_parabola_regression(data, now_ts)
 
     return GlucoseStatusAutoIsf(
         glucose=now.recalculated,
-        delta=delta,
-        shortAvgDelta=delta,
-        longAvgDelta=delta,
+        delta=reg["delta"],
+        shortAvgDelta=reg["delta"],
+        longAvgDelta=reg["delta"],
         date=now_ts,
-        duraISFminutes=duraISFminutes,
-        duraISFaverage=duraISFaverage,
-        parabolaMinutes=best["duraP"],
-        deltaPl=best["deltaPl"],
-        deltaPn=best["deltaPn"],
-        bgAcceleration=best["bgAcc"],
-        a0=best["a0"],
-        a1=best["a1"],
-        a2=best["a2"],
-        corrSqu=corr_max,
+        duraISFminutes=dura_minutes,
+        duraISFaverage=dura_avg,
+        parabolaMinutes=reg["duraP"],
+        deltaPl=reg["deltaPl"],
+        deltaPn=reg["deltaPn"],
+        bgAcceleration=reg["bgAcc"],
+        a0=reg["a0"],
+        a1=reg["a1"],
+        a2=reg["a2"],
+        corrSqu=reg["corr"],
     )

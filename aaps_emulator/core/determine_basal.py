@@ -19,25 +19,45 @@ from aaps_emulator.core.future_iob_engine import InsulinCurveParams, generate_fu
 from aaps_emulator.core.utils import round_half_even
 
 
-# helper rounding wrappers used in determine_basal
+MIN_BG_VALUE = 39.0
+
+
+# -------------------------
+# Вспомогательные функции
+# -------------------------
 def round_val(x: float, digits: int = 0) -> float:
+    """Обёртка над round_half_even с защитой от None."""
     if digits is None:
         return float(int(round(x)))
     return round_half_even(x, digits)
 
 
 def round_basal(x: float) -> float:
+    """Округление базала до шагов 0.05 (как в AAPS)."""
     return round(x * 20.0) / 20.0
 
 
 def without_zeros(x: float) -> str:
+    """Форматирование числа без лишних нулей в конце."""
     s = f"{x:.2f}"
     if "." in s:
         s = s.rstrip("0").rstrip(".")
     return s
 
 
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except Exception:
+        return default
+
+
 def get_max_safe_basal(profile: OapsProfileAutoIsf) -> float:
+    """
+    AAPS‑подобный расчёт максимального безопасного базала.
+    """
     max_daily_basal = getattr(profile, "max_daily_basal", profile.current_basal)
     max_basal = getattr(profile, "max_basal", profile.current_basal)
     max_daily_safety_multiplier = getattr(profile, "max_daily_safety_multiplier", 3.0)
@@ -58,18 +78,22 @@ def set_temp_basal(
     res: DosingResult,
     currenttemp: TempBasal,
 ) -> DosingResult:
+    """
+    Простая обёртка: выставить временный базал в результат.
+    (profile и currenttemp оставлены в сигнатуре для совместимости с AAPS‑стилем.)
+    """
     res.rate = float(rate)
     res.duration = int(duration)
     return res
 
 
-MIN_BG_VALUE = 39.0
-
-
+# -------------------------
+# Расчёт дельт по истории глюкозы
+# -------------------------
 def compute_deltas(glucose_history):
     """
-    glucose_history: list newest->oldest, each item must have .recalculated and .timestamp (ms)
-    Returns: (delta, shortAvgDelta, longAvgDelta) in mg/dL per 5 minutes (AAPS units)
+    glucose_history: список newest->oldest, каждый элемент должен иметь .recalculated и .timestamp (ms)
+    Возвращает: (delta, shortAvgDelta, longAvgDelta) в mg/dL за 5 минут (как в AAPS).
     """
     if not glucose_history or len(glucose_history) < 2:
         return 0.0, 0.0, 0.0
@@ -85,9 +109,9 @@ def compute_deltas(glucose_history):
         if now_recalc is None:
             return 0.0, 0.0, 0.0
 
-    last_deltas = []
-    short_deltas = []
-    long_deltas = []
+    last_deltas: List[float] = []
+    short_deltas: List[float] = []
+    long_deltas: List[float] = []
 
     for i in range(1, len(glucose_history)):
         then = glucose_history[i]
@@ -115,7 +139,7 @@ def compute_deltas(glucose_history):
         elif minutes_ago > 42.5:
             break
 
-    def avg(arr):
+    def avg(arr: List[float]) -> float:
         return sum(arr) / len(arr) if arr else 0.0
 
     short_avg = avg(short_deltas)
@@ -125,6 +149,9 @@ def compute_deltas(glucose_history):
     return delta, short_avg, long_avg
 
 
+# -------------------------
+# Основной алгоритм determine_basal_autoisf
+# -------------------------
 def determine_basal_autoisf(
     glucose_status: GlucoseStatusAutoIsf,
     currenttemp: TempBasal,
@@ -146,20 +173,18 @@ def determine_basal_autoisf(
     minGuardBG = debug.get("minGuardBG")
 
     # safe max_iob fallback
-    max_iob = getattr(profile, "max_iob", None)
-    try:
-        max_iob = float(max_iob) if max_iob is not None else 0.0
-    except Exception:
-        max_iob = 0.0
+    max_iob = _safe_float(getattr(profile, "max_iob", None), 0.0)
 
     enableSMB = bool(getattr(profile, "enableSMB", False))
-    smb_ratio = float(getattr(profile, "smb_delivery_ratio", 1.0) or 1.0)
-    iob_threshold_percent = float(getattr(profile, "iob_threshold_percent", 30) or 30)
+    smb_ratio = _safe_float(getattr(profile, "smb_delivery_ratio", 1.0), 1.0)
+    iob_threshold_percent = _safe_float(
+        getattr(profile, "iob_threshold_percent", 30), 30.0
+    )
 
     if glucose_status is None or profile is None or iob_data is None:
         return res
 
-    bg = float(getattr(glucose_status, "glucose", 0.0))
+    bg = _safe_float(getattr(glucose_status, "glucose", 0.0), 0.0)
 
     # deltas from glucose_status or debug fallback
     delta = getattr(glucose_status, "delta", None)
@@ -167,20 +192,21 @@ def determine_basal_autoisf(
     longAvgDelta = getattr(glucose_status, "longAvgDelta", None)
 
     if delta is None:
-        delta = float(debug.get("delta", 0.0))
+        delta = _safe_float(debug.get("delta", 0.0), 0.0)
     if shortAvgDelta is None:
-        shortAvgDelta = float(debug.get("shortAvgDelta", 0.0))
+        shortAvgDelta = _safe_float(debug.get("shortAvgDelta", 0.0), 0.0)
     if longAvgDelta is None:
-        longAvgDelta = float(debug.get("longAvgDelta", 0.0))
+        longAvgDelta = _safe_float(debug.get("longAvgDelta", 0.0), 0.0)
 
-    min_bg = float(getattr(profile, "min_bg", 0.0))
-    max_bg = float(getattr(profile, "max_bg", 0.0))
+    min_bg = _safe_float(getattr(profile, "min_bg", 0.0), 0.0)
+    max_bg = _safe_float(getattr(profile, "max_bg", 0.0), 0.0)
+
     # profile.target_bg может быть None — используем fallback (среднее min/max)
     _tg = getattr(profile, "target_bg", None)
     if _tg is None:
         target_bg = (min_bg + max_bg) / 2.0
     else:
-        target_bg = float(_tg)
+        target_bg = _safe_float(_tg, (min_bg + max_bg) / 2.0)
 
     # --- safe sens selection: prefer positive variable_sens, fallback to profile.sens ---
     _vs = getattr(profile, "variable_sens", None)
@@ -196,20 +222,20 @@ def determine_basal_autoisf(
             sens = 100.0
 
     # current basal and LGS threshold with safe fallbacks
-    basal = float(getattr(profile, "current_basal", 0.0) or 0.0)
+    basal = _safe_float(getattr(profile, "current_basal", 0.0), 0.0)
     _lgs = getattr(profile, "lgsThreshold", None)
-    lgs_threshold = float(_lgs) if (_lgs is not None) else 72.0
+    lgs_threshold = _safe_float(_lgs, 72.0)
 
     IOBpredBGs: List[float] = predictions.get("IOB", []) or []
     predictions.get("COB", []) or []
     predictions.get("UAM", []) or []
     predictions.get("ZT", []) or []
 
-    naive_eventualBG = float(debug.get("naive_eventualBG", bg))
-    eventualBG = float(debug.get("eventualBG", naive_eventualBG))
-    minPredBG = float(debug.get("minPredBG", eventualBG))
-    minGuardBG = float(debug.get("minGuardBG", minPredBG))
-    avgPredBG = float(debug.get("avgPredBG", eventualBG))
+    naive_eventualBG = _safe_float(debug.get("naive_eventualBG", bg), bg)
+    eventualBG = _safe_float(debug.get("eventualBG", naive_eventualBG), naive_eventualBG)
+    minPredBG = _safe_float(debug.get("minPredBG", eventualBG), eventualBG)
+    minGuardBG = _safe_float(debug.get("minGuardBG", minPredBG), minPredBG)
+    avgPredBG = _safe_float(debug.get("avgPredBG", eventualBG), eventualBG)
 
     maxDelta = max(delta, shortAvgDelta, longAvgDelta)
     minDelta = min(delta, shortAvgDelta, longAvgDelta)
@@ -224,9 +250,7 @@ def determine_basal_autoisf(
         f"minGuardBG={minGuardBG} avgPredBG={avgPredBG} sens={sens}. "
     )
 
-    # ... (LGS branches remain unchanged) ...
-
-    # carbsReq logic (safe CSF and division)
+    # --- carbsReq logic (safe CSF and division) ---
     carbsReqBG = naive_eventualBG
     if carbsReqBG < 40:
         carbsReqBG = min(minGuardBG, carbsReqBG)
@@ -273,7 +297,6 @@ def determine_basal_autoisf(
 
     carbsReq = round_val(((bgUndershoot - zeroTempEffectDouble) / csf - COBforCarbsReq))
     carbsReq = max(0, int(carbsReq))
-
     carbsReq = max(0, carbsReq)
 
     if (
@@ -345,11 +368,7 @@ def determine_basal_autoisf(
         if sens != 0
         else 0.0
     )
-    max_iob = getattr(profile, "max_iob", None)
-    try:
-        max_iob = float(max_iob) if max_iob is not None else 0.0
-    except Exception:
-        max_iob = 0.0
+    max_iob = _safe_float(getattr(profile, "max_iob", None), 0.0)
 
     if insulinReq > max_iob - iob_data.iob:
         insulinReq = max_iob - iob_data.iob
@@ -405,26 +424,20 @@ def determine_basal_autoisf(
         iob_threshold_percent * iobTHtolerance / 10000.0
     ) * getattr(profile, "max_iob", 0.0)
 
-    # --- AAPS 3.4 SMB LOGIC ---
-    # Disable SMB if max_iob == 0
+    # --- AAPS 3.4 SMB LOGIC (первый блок, оставлен как есть) ---
     if getattr(profile, "max_iob", 0.0) <= 0:
         enableSMB = False
 
-    # Disable SMB if IOB above threshold
     if iob_data.iob > iobTHvirtual:
         enableSMB = False
 
-    # Disable SMB if bolus too recent
     if lastBolusAge < SMBInterval:
         enableSMB = False
 
-    # Disable SMB if BG rising too fast
     if maxDelta > 0.20 * bg:
         enableSMB = False
 
-    # SMB allowed?
     if microBolusAllowed and enableSMB and bg > threshold:
-        # Meal insulin requirement
         mealInsulinReq = (
             round_val(
                 getattr(meal, "mealCOB", 0.0)
@@ -435,10 +448,8 @@ def determine_basal_autoisf(
             else 0.0
         )
 
-        # SMB max range
         smb_max_range = getattr(profile, "smb_delivery_ratio", 0.5)
 
-        # UAM-sensitive SMB
         if iob_data.iob > mealInsulinReq and iob_data.iob > 0:
             maxBolus = round_val(
                 smb_max_range
@@ -460,42 +471,34 @@ def determine_basal_autoisf(
                 1,
             )
 
-        # Round to bolus increment
         bolus_increment = getattr(profile, "bolus_increment", 0.1) or 0.1
         roundSMBTo = int(1.0 / bolus_increment)
         if roundSMBTo <= 0:
             roundSMBTo = 10
 
-        # Compute microBolus
         microBolus = min(insulinReq / 2.0, maxBolus)
 
-        # Apply SMB ratio (AutoISF)
         smb_ratio = getattr(profile, "smb_delivery_ratio", 0.5)
         microBolus = min(insulinReq * smb_ratio, maxBolus)
 
-        # Apply IOB threshold
         if microBolus > iobTHvirtual - iob_data.iob:
             microBolus = max(0.0, iobTHvirtual - iob_data.iob)
 
-        # Round to increment
         microBolus = int(microBolus * roundSMBTo) / float(roundSMBTo)
 
-        # SMBInterval check
         if lastBolusAge >= SMBInterval - 6.0:
             if microBolus > 0:
                 res.units = microBolus
 
-        # If SMB delivered, still return temp basal if needed
         if insulinReq > 0:
             res.rate = rate
             res.duration = 30
             return res
 
-    # --- AAPS: disable SMB if max_iob == 0 ---
+    # --- AAPS: второй блок SMB (оставлен для 1:1 совместимости) ---
     if getattr(profile, "max_iob", 0.0) <= 0:
         enableSMB = False
 
-    # --- AAPS: disable SMB if IOB above threshold ---
     if iob_data.iob > iobTHvirtual:
         enableSMB = False
 
@@ -553,7 +556,6 @@ def determine_basal_autoisf(
         lastBolusAge = max(0.0, (currentTime - lastBolusTime) / 1000.0)
         SMBInterval = min(10, max(1, int(getattr(profile, "SMBInterval", 5)))) * 60.0
 
-        # --- AAPS: disable SMB if bolus too recent ---
         if lastBolusAge < SMBInterval:
             enableSMB = False
 
@@ -566,7 +568,9 @@ def determine_basal_autoisf(
             res.duration = 30
             return res
 
-    # Finalization
+    # -------------------------
+    # Финализация temp basal
+    # -------------------------
     try:
         rate = float(rate)
     except Exception:
@@ -592,7 +596,9 @@ def determine_basal_autoisf(
     return set_temp_basal(rate, 30, profile, res, currenttemp)
 
 
-# wrapper for pipeline
+# -------------------------
+# Обёртка для пайплайна
+# -------------------------
 def run_determine_basal(
     inputs: AutoIsfInputs,
     pred: CorePredResultAlias,
@@ -666,7 +672,6 @@ def run_determine_basal(
         pass
 
     # --- prepare iob_data for determine_basal: prefer generated Oref1 future ticks ---
-    # take first provided tick (or zero fallback)
     iob_source = (
         inputs.iob_data_array[0]
         if inputs.iob_data_array
@@ -680,7 +685,6 @@ def run_determine_basal(
         )
         params = InsulinCurveParams(dia_hours=float(dia_hours), step_minutes=5)
         future_iob = generate_future_iob(iob_source, params)
-        # use first future tick at t=5min (index 1) for activity-based decisions if available
         if future_iob and len(future_iob) > 1:
             iob_data_for_determine = future_iob[1]
         else:
@@ -688,7 +692,6 @@ def run_determine_basal(
 
     except Exception:
         iob_data_for_determine = iob_source
-    # --- end iob_data preparation ---
 
     result = determine_basal_autoisf(
         glucose_status=inputs.glucose_status,
@@ -702,7 +705,7 @@ def run_determine_basal(
         microBolusAllowed=micro_bolus_allowed,
         debug=debug,
     )
-    
+
     # Temporary test adjustment: if insulinReq == 0 and duration > 30, clamp duration to 30
     try:
         if (

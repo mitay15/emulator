@@ -196,7 +196,10 @@ def analyze(csv_path: Path):
 
 
 if __name__ == "__main__":
-    csv_path = Path("aaps_emulator/data/reports/autoisf_results.csv")
+    ROOT = Path(__file__).resolve().parents[2]
+    DATA = ROOT / "data"
+    csv_path = DATA / "reports" / "autoisf_results.csv"
+
     if not csv_path.exists():
         print(f"CSV not found: {csv_path}")
     else:

@@ -5,9 +5,10 @@ from pathlib import Path
 import subprocess
 import sys
 
-ROOT = Path(__file__).parent.parent
-SUMMARY = ROOT / "data" / "reports" / "compare" / "summary.json"
-CACHE = ROOT / "data" / "cache"
+ROOT = Path(__file__).resolve().parents[2]
+DATA = ROOT / "data"
+SUMMARY = DATA / "reports" / "compare" / "summary.json"
+CACHE = DATA / "cache"
 
 
 def run_compare_runner():

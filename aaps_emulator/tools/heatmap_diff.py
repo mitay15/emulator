@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # --- ВАЖНО: правильный корень пакета ---
-ROOT = Path(__file__).parent.parent
+ROOT = Path(__file__).resolve().parents[2]
+DATA = ROOT / "data"
 
 
 def _load_summary(path: Path) -> Dict[str, Any]:
@@ -76,13 +77,13 @@ def main() -> None:
     parser.add_argument(
         "--summary",
         type=str,
-        default=str(ROOT / "data" / "reports" / "compare" / "summary.json"),
+        default=str(DATA / "reports" / "compare" / "summary.json"),
         help="Path to summary.json (from compare_runner)",
     )
     parser.add_argument(
         "--out",
         type=str,
-        default=str(ROOT / "data" / "reports" / "heatmaps" / "diff_heatmap.png"),
+        default=str(DATA / "reports" / "heatmaps" / "diff_heatmap.png"),
         help="Output PNG path",
     )
     args = parser.parse_args()

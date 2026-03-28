@@ -7,21 +7,22 @@ from .predictions import run_predictions
 
 def compute_core_predictions(inputs: AutoIsfInputs) -> CorePredResultAlias:
     """
-    Wrapper over run_predictions returning CorePredResultAlias for AutoISF module.
-    Uses AutoISF (no DynISF).
+    Преобразует PredictionsResult → CorePredResultAlias.
+    Используется AutoISF (без DynISF).
     """
-    res = run_predictions(inputs)
+    pred = run_predictions(inputs)
+    gs = inputs.glucose_status
 
-    # map PredictionsResult -> CorePredResultAlias
     return CorePredResultAlias(
-        bg=getattr(inputs.glucose_status, "glucose", None),
-        delta=getattr(inputs.glucose_status, "delta", None),
-        eventual_bg=getattr(res, "eventual_bg", None),
-        min_pred_bg=getattr(res, "min_pred_bg", None),
-        min_guard_bg=getattr(res, "min_guard_bg", None),
-        pred_iob=getattr(res, "pred_iob", []) or [],
-        pred_cob=getattr(res, "pred_cob", []) or [],
-        pred_uam=getattr(res, "pred_uam", []) or [],
-        pred_zt=getattr(res, "pred_zt", []) or [],
+        bg=getattr(gs, "glucose", None),
+        delta=getattr(gs, "delta", None),
+        eventual_bg=pred.eventual_bg,
+        min_pred_bg=pred.min_pred_bg,
+        min_guard_bg=pred.min_guard_bg,
+        pred_iob=list(pred.pred_iob),
+        pred_cob=list(pred.pred_cob),
+        pred_uam=list(pred.pred_uam),
+        pred_zt=list(pred.pred_zt),
         trace=[],
+        raw={"predictions": pred.__dict__},
     )

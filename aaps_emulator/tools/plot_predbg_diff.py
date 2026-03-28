@@ -106,7 +106,10 @@ def main() -> None:
     if args.out:
         out_path = Path(args.out)
     else:
-        out_dir = Path("data") / "reports" / "predbg_diff"
+        ROOT = Path(__file__).resolve().parents[2]
+        DATA = ROOT / "data"
+        out_dir = DATA / "reports" / "predbg_diff"
+
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / f"{mismatch_path.stem}.png"
 
