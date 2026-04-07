@@ -1,59 +1,161 @@
-import sys
+# run.py
+import shutil
+import argparse
 import subprocess
 
-from aaps_emulator.optimizer.genetic_optimizer import run_optimizer
+from aaps_emulator.optimizer.genetic_optimizer import optimize_profile
 from aaps_emulator.runner.compare_runner import compare_logs
 from aaps_emulator.runner.build_inputs import build_inputs_from_logs
 
 
-def run_ga():
-    print("🚀 Running Auto‑GA v3 optimizer…")
-    result = run_optimizer(max_generations=10, population_size=20)
-    print("✔ Done. Best fitness:", result.best_fitness)
+# ---------------------------------------------------------
+#  Цвета
+# ---------------------------------------------------------
+class C:
+    CYAN = "\033[96m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
+    END = "\033[0m"
 
 
-def run_compare():
-    print("🔍 Running compare_runner…")
-    stats = compare_logs(return_stats=True)
-    print("✔ Done. Total blocks:", stats.get("total_blocks"))
+# ---------------------------------------------------------
+#  Auto‑GA v3
+# ---------------------------------------------------------
+def run_ga(args):
+    print(f"{C.CYAN}🚀 Running Auto‑GA v3 optimizer…{C.END}")
+
+    blocks = [(0, 1000, [{"dummy": True}])]
+    base_profile = {"sens": 50, "carb_ratio": 10, "current_basal": 1.0}
+    override_profile = {}
+
+    result = optimize_profile(
+        blocks=blocks,
+        base_profile=base_profile,
+        override_profile=override_profile,
+        generations=args.generations,
+        population_size=args.population,
+        elitism=args.elitism,
+        auto_mode=args.auto,
+    )
+
+    best_fitness = result.history[-1].best_fitness
+    print(f"{C.GREEN}✔ Done. Best fitness: {best_fitness}{C.END}")
 
 
-def run_inputs():
-    print("📦 Generating inputs_before_algo_block_* from logs…")
-    build_inputs_from_logs()
-    print("✔ Done.")
+# ---------------------------------------------------------
+#  Compare Runner
+# ---------------------------------------------------------
+def run_compare(args):
+    print(f"{C.CYAN}🔍 Running compare_runner…{C.END}")
+
+    stats = compare_logs(
+        fast=args.fast,
+        return_stats=True,
+        extract_clean=args.extract_clean,
+    )
+
+    print(f"{C.GREEN}✔ Done. Total blocks: {stats.get('total_blocks')}{C.END}")
 
 
-def run_gui():
-    print("🖥  Launching Streamlit GUI…")
+# ---------------------------------------------------------
+#  Build Inputs
+# ---------------------------------------------------------
+def run_inputs(args):
+    print(f"{C.CYAN}📦 Generating inputs_before_algo_block_* from logs…{C.END}")
+    build_inputs_from_logs(logs_dir=args.logs, out_dir=args.out)
+    print(f"{C.GREEN}✔ Done.{C.END}")
+
+
+# ---------------------------------------------------------
+#  GUI
+# ---------------------------------------------------------
+def run_gui(args):
+    print(f"{C.CYAN}🖥  Launching Streamlit GUI…{C.END}")
+
+    if shutil.which("streamlit") is None:
+        print(f"{C.RED}❌ Streamlit не установлен.{C.END}")
+        print(f"{C.YELLOW}Установи командой: pip install streamlit{C.END}")
+        return
+
     subprocess.run(["streamlit", "run", "aaps_emulator/gui/gui_simulator.py"])
 
 
-def run_tests():
-    print("🧪 Running pytest…")
+# ---------------------------------------------------------
+#  Tests
+# ---------------------------------------------------------
+def run_tests(args):
+    print(f"{C.CYAN}🧪 Running pytest…{C.END}")
     subprocess.run(["pytest", "-q"])
 
 
+# ---------------------------------------------------------
+#  Prepare (inputs + compare + tests)
+# ---------------------------------------------------------
+def run_prepare(args):
+    print(f"{C.CYAN}🔧 Preparing project…{C.END}")
+
+    run_inputs(args)
+    run_compare(args)
+    run_tests(args)
+
+    print(f"{C.GREEN}✔ Project fully prepared.{C.END}")
+
+
+# ---------------------------------------------------------
+#  Main CLI
+# ---------------------------------------------------------
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python run.py [ga|compare|inputs|gui|test]")
+    parser = argparse.ArgumentParser(
+        description="AAPS Emulator — Developer CLI",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    sub = parser.add_subparsers(dest="cmd")
+
+    # GA
+    p_ga = sub.add_parser("ga", help="Run Auto‑GA optimizer")
+    p_ga.add_argument("--generations", type=int, default=3)
+    p_ga.add_argument("--population", type=int, default=6)
+    p_ga.add_argument("--elitism", type=int, default=1)
+    p_ga.add_argument("--auto", action="store_true", help="Enable Auto‑GA v3 adaptive mode")
+    p_ga.set_defaults(func=run_ga)
+
+    # Compare
+    p_cmp = sub.add_parser("compare", help="Compare Python vs AAPS logs")
+    p_cmp.add_argument("--fast", action="store_true")
+    p_cmp.add_argument("--extract-clean", action="store_true")
+    p_cmp.set_defaults(func=run_compare)
+
+    # Inputs
+    p_in = sub.add_parser("inputs", help="Generate inputs_before_algo_block_*")
+    p_in.add_argument("--logs", default="data/logs")
+    p_in.add_argument("--out", default="data/cache")
+    p_in.set_defaults(func=run_inputs)
+
+    # GUI
+    p_gui = sub.add_parser("gui", help="Launch Streamlit GUI")
+    p_gui.set_defaults(func=run_gui)
+
+    # Tests
+    p_test = sub.add_parser("test", help="Run pytest")
+    p_test.set_defaults(func=run_tests)
+
+    # Prepare
+    p_prep = sub.add_parser("prepare", help="Generate inputs + compare + tests")
+    p_prep.add_argument("--logs", default="data/logs")
+    p_prep.add_argument("--out", default="data/cache")
+    p_prep.add_argument("--fast", action="store_true")
+    p_prep.add_argument("--extract-clean", action="store_true")
+    p_prep.set_defaults(func=run_prepare)
+
+    args = parser.parse_args()
+
+    if not args.cmd:
+        parser.print_help()
         return
 
-    cmd = sys.argv[1]
-
-    if cmd == "ga":
-        run_ga()
-    elif cmd == "compare":
-        run_compare()
-    elif cmd == "inputs":
-        run_inputs()
-    elif cmd == "gui":
-        run_gui()
-    elif cmd == "test":
-        run_tests()
-    else:
-        print("Unknown command:", cmd)
-        print("Usage: python run.py [ga|compare|inputs|gui|test]")
+    args.func(args)
 
 
 if __name__ == "__main__":

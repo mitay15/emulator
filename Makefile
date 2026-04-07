@@ -62,18 +62,16 @@ docs:
     pdoc -o docs aaps_emulator
 
 # -----------------------
-#  Очистка
+#  Очистка (Windows‑friendly)
 # -----------------------
 
 clean:
-    rm -rf __pycache__ */__pycache__
-    rm -rf .pytest_cache
-    rm -rf dist build
-    rm -rf data/cache/*
-    rm -rf data/reports/*
+    powershell -Command "Remove-Item -Recurse -Force __pycache__, */__pycache__ -ErrorAction SilentlyContinue"
+    powershell -Command "Remove-Item -Recurse -Force .pytest_cache, dist, build -ErrorAction SilentlyContinue"
+    powershell -Command "Remove-Item -Recurse -Force data/cache/*, data/reports/* -ErrorAction SilentlyContinue"
 
 # -----------------------
-#  Релиз
+#  Релиз (требует Git Bash)
 # -----------------------
 
 release:

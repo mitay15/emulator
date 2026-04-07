@@ -6,6 +6,8 @@ import logging
 import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from aaps_emulator.runner.load_logs import load_logs
+
 
 from aaps_emulator.core.autoisf_structs import (
     AutoIsfInputs,
@@ -275,3 +277,78 @@ def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
         except Exception:
             logger.exception("Failed to write error dump for build_inputs")
         raise
+
+# ---------------------------------------------------------
+#  Генерация inputs_before_algo_block_* из логов AAPS
+# ---------------------------------------------------------
+
+
+def build_inputs_from_logs(
+    logs_dir: str = "data/logs",
+    out_dir: str = "data/cache"
+):
+    """
+    Загружает логи AAPS, выделяет AutoISF-блоки и сохраняет
+    inputs_before_algo_block_*.json в data/cache/.
+    Логика выделения блоков полностью совпадает с compare_runner.
+    """
+
+    logs_path = Path(logs_dir)
+    out_path = Path(out_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    # Ищем .json, .log, .zip
+    files = sorted(
+        list(logs_path.rglob("*.json")) +
+        list(logs_path.rglob("*.log")) +
+        list(logs_path.rglob("*.zip"))
+    )
+
+    if not files:
+        print(f"⚠ Нет логов в {logs_path}")
+        return
+
+    counter = 1
+
+    for f in files:
+        print(f"📄 Чтение {f.name}...")
+        try:
+            parsed = load_logs(f)
+        except Exception as e:
+            print(f"❌ Ошибка чтения {f}: {e}")
+            continue
+
+        # --- ЛОГИКА ВЫДЕЛЕНИЯ БЛОКОВ (как в compare_runner) ---
+        blocks = []
+        i = 0
+        n = len(parsed)
+
+        while i < n:
+            obj = parsed[i]
+            if isinstance(obj, dict) and obj.get("__type__") == "GlucoseStatusAutoIsf":
+                block = [obj]
+                j = i + 1
+                while j < n:
+                    block.append(parsed[j])
+                    if isinstance(parsed[j], dict) and parsed[j].get("__type__") == "RT":
+                        break
+                    j += 1
+                blocks.append(block)
+                i = j + 1
+            else:
+                i += 1
+
+        print(f"  → найдено {len(blocks)} AutoISF-блоков")
+
+        # --- СОХРАНЕНИЕ ---
+        for block in blocks:
+            try:
+                inputs = build_inputs_from_block(block)
+                out_file = out_path / f"inputs_before_algo_block_{counter:05d}.json"
+                with out_file.open("w", encoding="utf-8") as fp:
+                    json.dump(inputs.to_dict(), fp, ensure_ascii=False, indent=2)
+                counter += 1
+            except Exception as e:
+                print(f"❌ Ошибка обработки блока: {e}")
+
+    print(f"✔ Создано {counter-1} файлов inputs_before_algo_block_*")
