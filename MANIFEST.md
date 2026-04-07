@@ -1,219 +1,389 @@
-# 📄 **MANIFEST.md — Полное описание проекта AAPS Emulator (АКТУАЛЬНО)**
+# ✅ **MANIFEST.md (полная профессиональная версия)**
 
-## 📌 Назначение проекта
+```markdown
+# AAPS‑Emulator — Manifest
 
-**AAPS Emulator** — это полноценный Python‑пакет, реализующий алгоритм **AUTOISF** и связанные компоненты AndroidAPS 3.4:
+## Обзор проекта
 
-- парсинг Kotlin‑логов AAPS  
-- восстановление входных данных алгоритма  
-- выполнение AutoISF → Predictions → DetermineBasal  
+**AAPS‑Emulator** — это Python‑реализация алгоритма AutoISF и предсказаний AndroidAPS (версия 3.4), созданная для полного паритета с оригинальной логикой.  
+Проект включает:
+
+- полный AutoISF pipeline  
+- DetermineBasal  
+- Predictions (IOB/COB/UAM/ZT)  
+- парсер Kotlin‑объектов  
+- генерацию входов для алгоритма  
 - сравнение Python ↔ AAPS  
-- генерация отчётов и визуализаций  
-- интерактивный HTML‑отчёт  
+- визуализацию  
+- отчётность  
+- **Auto‑GA v3** — профессиональный оптимизатор профиля  
 
-Проект предназначен для анализа, тестирования и исследования алгоритма AUTOISF вне AndroidAPS.
+Проект используется для:
+
+- регрессионного тестирования  
+- анализа поведения алгоритма  
+- отладки  
+- CI‑валидации  
+- исследования AutoISF  
+- автоматического подбора sens/carb_ratio/AutoISF параметров  
 
 ---
 
-# 📁 **1. Корневая структура проекта (ПАКЕТ)**
+# 📁 Структура проекта
 
 ```
 AAPS-Emulator/
-│
-├── pyproject.toml
+├── aaps_emulator/
+├── data/
+├── out/
+├── scripts/
+├── tests/
+├── .github/
+├── MANIFEST.md
+├── INSTALL.md
 ├── README.md
+├── pyproject.toml
+├── requirements.txt
 ├── run_all.py
 ├── run_tests.py
+└── HOW_START_CHECK.md
+
+
+aaps_emulator/
+│   __init__.py
+│   import_check_output.txt
 │
-└── aaps_emulator/                 ← Python‑пакет
-    │
-    ├── __init__.py
-    │
-    ├── core/
-    │   ├── __init__.py
-    │   ├── autoisf_pipeline.py
-    │   ├── autoisf_structs.py
-    │   ├── determine_basal.py
-    │   ├── future_iob_engine.py
-    │   ├── glucose_status_autoisf.py
-    │   ├── predictions.py
-    │   ├── utils.py
-    │
-    ├── runner/
-    │   ├── __init__.py
-    │   ├── compare_runner.py
-    │   ├── load_logs.py
-    │   ├── build_inputs.py
-    │   ├── kotlin_parser.py
-    │
-    ├── tools/
-    │   ├── __init__.py
-    │   ├── run_full_report.py
-    │   ├── plot_predbg_diff.py
-    │   ├── heatmap_diff.py
-    │   ├── generate_inputs_from_logs.py
-    │   ├── debug_one_block.py
-    │   ├── diff_report.py
-    │   ├── generate_html_report_interactive.py
-    │   ├── show_inputs.py
-    │
-    ├── tests/
-    │   ├── __init__.py
-    │   ├── conftest.py
-    │   ├── test_single_block_from_log.py
-    │   ├── test_all_blocks_parametrized.py
-    │   ├── test_full_pipeline.py
-    │   ├── test_full_suite.py
-    │   ├── test_plot_predbgs.py
-    │   ├── test_heatmap.py
-    │   ├── test_kotlin_parser.py
-    │
-    └── data/
-        ├── cache/
-        ├── logs/
-        └── reports/
+├── core/                     ← ядро эмулятора AutoISF
+│   ├── aps_what_if.py
+│   ├── autoisf_full.py
+│   ├── autoisf_pipeline.py
+│   ├── autoisf_predictions_adapter.py
+│   ├── autoisf_structs.py
+│   ├── block_utils.py
+│   ├── cache.py
+│   ├── determine_basal.py
+│   ├── future_iob_engine.py
+│   ├── glucose_status_autoisf.py
+│   ├── predictions.py
+│   ├── utils.py
+│   └── __init__.py
+│
+├── optimizer/                ← Auto‑GA v3 оптимизатор
+│   ├── autoisf_internal.py
+│   ├── crossover.py
+│   ├── fitness_functions.py
+│   ├── genetic_optimizer.py
+│   ├── mutation.py
+│   ├── population.py
+│   ├── utils.py
+│   └── __init__.py
+│
+├── gui/                      ← Streamlit GUI
+│   ├── gui_simulator.py
+│   └── __init__.py
+│
+└── runner/                   ← инструменты для запуска и сравнения
+    ├── build_inputs.py
+    ├── compare_runner.py
+    ├── debug_load.py
+    ├── kotlin_parser.py
+    ├── load_logs.py
+    └── __init__.py
+
 ```
 
 ---
 
+# 🔬 **aaps_emulator/core** — ядро эмулятора AutoISF
 
-# 📁 **3. core/** — Алгоритм AUTOISF
+Полная реализация алгоритма AndroidAPS 3.4.
 
-### ✔ autoisf_pipeline.py  
-Главный pipeline: AutoISF → Predictions → DetermineBasal.
+## **aps_what_if.py**
+Сценарный анализ: пересчёт AutoISF при изменённых входах (what‑if simulation).
 
-### ✔ autoisf_structs.py  
-Структуры данных: Profile, Autosens, Meal, IOB, Inputs, GlucoseStatus.
+## **autoisf_full.py**
+Детальная реализация AutoISF:
 
-### ✔ glucose_status_autoisf.py  
-Анализ истории BG: delta, short_avg, long_avg, фильтрация.
+- bgAccel / bgBrake адаптации  
+- pp / dura адаптации  
+- lower/higher ISF range  
+- итоговый autoISF_factor  
+- variable_sens  
+- ограничения autoISF_min/max  
 
-### ✔ predictions.py  
-Предсказания BG: eventualBG, minPredBG, minGuardBG, predBGs.
+## **autoisf_pipeline.py**
+Оркестратор AutoISF:
 
-### ✔ determine_basal.py  
-DetermineBasal: insulinReq, rate, duration, SMB, safety caps.
+- сбор входов  
+- вычисление variable_sens  
+- вычисление dosing  
+- генерация предсказаний  
+- fallback‑логика  
+- возврат структурированных результатов  
 
-### ✔ future_iob_engine.py  
-Генерация будущего IOB.
+## **autoisf_predictions_adapter.py**
+Адаптер между AutoISF и Predictions:
 
-### ✔ utils.py  
-Вспомогательные функции.
+- объединяет результаты  
+- нормализует поля  
+- обеспечивает совместимость с AAPS  
 
----
+## **autoisf_structs.py**
+Типизированные структуры данных:
 
-# 📁 **4. runner/** — Парсинг логов и сравнение
+- GlucoseStatusAutoIsf  
+- IobTotal  
+- MealData  
+- AutosensResult  
+- ProfileAutoIsf  
+- PredictionsResult  
 
-### ✔ compare_runner.py  
-Главный модуль сравнения Python ↔ AAPS.
+Содержат дефолты, безопасные типы, raw‑данные.
 
-### ✔ load_logs.py  
-Загрузка логов (JSON, ZIP, LOG).
+## **block_utils.py**
+Работа с логами:
 
-### ✔ kotlin_parser.py  
-Парсинг Kotlin‑структур.
+- загрузка `.log`, `.json`, `.zip`  
+- извлечение Kotlin‑объектов  
+- группировка блоков по timestamp  
+- нормализация структуры  
 
-### ✔ build_inputs.py  
-Восстановление входных данных из логов.
+## **cache.py**
+Кэширование:
 
----
+- FITNESS_CACHE  
+- кэширование pipeline результатов  
 
-# 📁 **5. tools/** — Утилиты и отчёты
+## **determine_basal.py**
+Реализация DetermineBasal:
 
-### ✔ run_full_report.py  
-Полный отчёт: compare_runner → heatmap → predBG diff → интерактивный HTML.
+- SMB  
+- temp basal  
+- insulinReq  
+- ограничения безопасности  
 
-### ✔ plot_predbg_diff.py  
-Универсальный график AAPS vs Python.
+## **future_iob_engine.py**
+Расчёт будущего IOB для предсказаний.
 
-### ✔ heatmap_diff.py  
-Тепловая карта ошибок.
+## **glucose_status_autoisf.py**
+Обработка данных о глюкозе:
 
-### ✔ generate_inputs_from_logs.py  
-Создание inputs_before_algo_block_*.json.
+- delta  
+- prevDelta  
+- noise  
+- безопасные преобразования  
 
-### ✔ debug_one_block.py  
-Глубокая диагностика mismatch‑блока.
+## **predictions.py**
+Генерация predBG:
 
-### ✔ diff_report.py  
-Статистика по CSV.
+- IOB  
+- COB  
+- UAM  
+- ZT  
+- eventualBG  
+- minPredBG  
+- minGuardBG  
 
-### ✔ generate_html_report_interactive.py  
-Интерактивный Plotly‑отчёт.
+## **utils.py**
+Вспомогательные функции:
 
-### ✔ show_inputs.py  
-Просмотр входов по номеру блока.
-
----
-
-# 📁 **6. tests/** — Тесты
-
-Все тесты актуальны и соответствуют пакетной структуре:
-
-- test_single_block_from_log.py  
-- test_all_blocks_parametrized.py  
-- test_full_pipeline.py  
-- test_full_suite.py  
-- test_plot_predbgs.py  
-- test_heatmap.py  
-- test_kotlin_parser.py  
-- conftest.py  
-
----
-
-# 📁 **7. data/** — Данные
-
-### ✔ cache/  
-inputs_before_algo_block_*.json  
-mismatch_block_*.json  
-
-### ✔ logs/  
-исходные AAPS‑логи  
-
-### ✔ reports/  
-summary.json  
-heatmaps  
-predbg_diff  
-interactive HTML  
-
----
-
-# 📁 **8. Конфигурация пакета**
-
-### ✔ pyproject.toml  
-Единственный корректный способ установки пакета.
-
-### ✔ run_all.py  
-Единая точка входа для полного пайплайна.
-
-### ✔ run_tests.py  
-Запуск тестов.
+- безопасные конвертеры  
+- округления  
+- clamp  
+- фильтры блоков  
+- RMSE/MAE  
 
 ---
 
-# 📁 **9. Оригинальные файлы AAPS 3.4 (референс)**
+# 🤖 **aaps_emulator/optimizer** — Auto‑GA v3
 
-Ты просил, чтобы я их помнил — и я помню:
+Профессиональный оптимизатор профиля.
 
-### AUTOISF
-- AutoISF.kt  
-- Autosens.kt  
-- AutosensResult.kt  
+## **genetic_optimizer.py**
+Auto‑GA v3:
 
-### Predictions
-- Predictions.kt  
-- UAM.kt  
-- COB.kt  
-- IOB.kt  
+- адаптивная мутация  
+- адаптивный элитизм  
+- адаптивный размер популяции  
+- оценка разнообразия популяции  
+- адаптивные диапазоны параметров  
+- мягкий early stopping  
+- интеграция с GUI  
 
-### DetermineBasal
-- DetermineBasalAdapterSMB.kt  
-- DetermineBasalResult.kt  
+## **fitness_functions.py**
+Оценка качества профиля:
 
-### Inputs
-- GlucoseStatus.kt  
-- IobCobCalculatorPlugin.kt  
-- Profile.kt  
-- MealData.kt  
+- MAE eventualBG  
+- гипо/гипер штрафы  
+- SMB штрафы  
+- автоISF min/max штрафы  
+- стабильность variable_sens  
+- мягкие ограничения  
+- кэширование fitness  
+
+## **autoisf_internal.py**
+Внутренние переменные AutoISF:
+
+- bgAccel  
+- bgBrake  
+- pp  
+- dura  
+- weighted_sum  
+- autoISF_factor  
+- variable_sens  
+
+## **population.py**
+Генерация начальной популяции:
+
+- диапазоны параметров  
+- случайные значения  
+- нормализация  
+
+## **mutation.py**
+Мутация:
+
+- адаптивная интенсивность  
+- clamp  
+- учёт диапазонов  
+
+## **crossover.py**
+Кроссовер:
+
+- uniform  
+- mixed  
+- one‑point  
+
+## **utils.py**
+Служебные функции:
+
+- merge_profiles  
+- diff_profiles  
+- clamp  
+- safe_float  
+
+---
+
+# 🖥 **aaps_emulator/gui**
+
+## **gui_simulator.py**
+Streamlit‑GUI:
+
+- загрузка логов  
+- выбор диапазона дат  
+- редактирование профиля  
+- запуск Auto‑GA v3  
+- отображение fitness  
+- визуализация истории поколений  
+- вывод изменений профиля  
+- сохранение результата  
+
+---
+
+# ⚙️ **aaps_emulator/runner**
+
+## **build_inputs.py**
+Преобразование блоков в AutoIsfInputs:
+
+- безопасные конвертеры  
+- обработка None  
+- нормализация профиля  
+- построение всех структур  
+
+## **compare_runner.py**
+Сравнение Python ↔ AAPS:
+
+- прогон всех блоков  
+- сравнение eventualBG, minPredBG, SMB, variable_sens  
+- сохранение mismatch‑блоков  
+- генерация отчётов  
+
+## **debug_load.py**
+Отладочная загрузка блоков.
+
+## **kotlin_parser.py**
+Парсер Kotlin‑объектов:
+
+- поиск имени  
+- балансировка скобок  
+- извлечение ключ‑значение  
+- конвертация типов  
+- сохранение raw  
+
+## **load_logs.py**
+Загрузка логов:
+
+- рекурсивный поиск  
+- поддержка `.log`, `.json`, `.zip`  
+- извлечение Kotlin‑объектов  
+
+---
+
+# 🧰 **scripts**
+
+## **compare_real_vs_aaps.py**
+Ad‑hoc сравнение Python ↔ AAPS.
+
+## **quick_visual_test.py**
+Быстрая визуализация predBG.
+
+## **check_all.ps1**
+Запуск полного набора проверок.
+
+---
+
+# 🧪 **tests**
+
+Полный набор тестов:
+
+- парсинг Kotlin  
+- построение входов  
+- AutoISF pipeline  
+- DetermineBasal  
+- Predictions  
+- визуализация  
+- heatmap  
+- сравнение с эталонными блоками  
+
+---
+
+# 📁 **data/**
+
+- **logs/** — исходные логи AAPS  
+- **cache/** — inputs_before_algo_block, mismatch‑блоки  
+- **clean/** — clean‑блоки  
+- **reports/** — HTML, PNG, heatmaps  
+
+---
+
+# 🚀 Основные сценарии использования
+
+### Быстрый прогон сравнения
+```bash
+python -m aaps_emulator.runner.compare_runner --fast
+```
+
+### Полный отчёт
+```bash
+python -m aaps_emulator.tools.run_full_report --open
+```
+
+### Запуск GUI
+```bash
+streamlit run aaps_emulator/gui/gui_simulator.py
+```
+
+### Запуск тестов
+```bash
+pytest -q
+```
+
+---
+
+# 📌 Рекомендации по разработке
+
+- использовать pre‑commit (ruff, autoflake)  
+- проверять паритет на эталонных блоках  
+- добавлять тесты при изменении парсера или AutoISF  
+- хранить артефакты в `data/`, а не в пакете  
 
 ---

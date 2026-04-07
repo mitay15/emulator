@@ -1,0 +1,108 @@
+Структура папок
+Серийный номер тома: BE63-86E3
+C:.
+│   .coverage
+│   .gitignore
+│   .pre-commit-config.yaml
+│   get-pip.py
+│   HOW_START_CHECK.md
+│   INSTALL.md
+│   MANIFEST.md
+│   mypy.ini
+│   pyproject.toml
+│   pytest.ini
+│   README.md
+│   requirements.txt
+│   run_all.py
+│   run_tests.py
+│   structure.txt
+│   
+├───.github
+│   └───workflows
+│           ci.yml
+│           release.yml
+│           
+
+├───aaps_emulator
+│   │   import_check_output.txt
+│   │   __init__.py
+│   │   
+│   ├───core
+│   │   │   aps_what_if.py
+│   │   │   autoisf_full.py
+│   │   │   autoisf_pipeline.py
+│   │   │   autoisf_predictions_adapter.py
+│   │   │   autoisf_structs.py
+│   │   │   block_utils.py
+│   │   │   cache.py
+│   │   │   determine_basal.py
+│   │   │   future_iob_engine.py
+│   │   │   glucose_status_autoisf.py
+│   │   │   predictions.py
+│   │   │   utils.py
+│   │   │   __init__.py
+│   │      
+│   │           
+│   ├───gui
+│   │       gui_simulator.py
+│   │       __init__.py
+│   │       
+│   ├───optimizer
+│   │   │   autoisf_internal.py
+│   │   │   crossover.py
+│   │   │   fitness_functions.py
+│   │   │   genetic_optimizer.py
+│   │   │   mutation.py
+│   │   │   population.py
+│   │   │   utils.py
+│   │   │   __init__.py
+│   │      
+│   │           
+│   ├───runner
+│       │   build_inputs.py
+│       │   compare_runner.py
+│       │   debug_load.py
+│       │   kotlin_parser.py
+│       │   load_logs.py
+│       │   __init__.py
+│       │   
+│           
+├───data
+│   ├───cache
+│   │       
+│   ├───clean
+│   ├───logs
+│   │       
+│   └───reports
+│       │   
+│       ├───compare
+│       │       
+│       ├───heatmap
+│       │       
+│       ├───heatmaps
+│       │       
+│       ├───html
+│       │       
+│       ├───plots
+│       │       
+│       └───predbg_diff
+├───out
+│       comparison_pairs.csv
+│       
+├───scripts
+│       check_all.log
+│       check_all.ps1
+│       compare_real_vs_aaps.py
+│       quick_visual_test.py
+│       
+├───tests
+│   │   conftest.py
+│   │   test_all_blocks_parametrized.py
+│   │   test_full_pipeline.py
+│   │   test_full_suite.py
+│   │   test_heatmap.py
+│   │   test_kotlin_parser.py
+│   │   test_plot_predbgs.py
+│   │   test_single_block_from_log.py
+│   │   test_visual_dashboard.py
+    │   __init__.py

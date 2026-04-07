@@ -274,9 +274,12 @@ def determine_basal_autoisf(
     sens_val = sens if sens and sens > 0 else getattr(profile, "sens", 1.0) or 1.0
     zeroTempEffectDouble = profile.current_basal * sens_val * zeroTempDuration / 60.0
 
+    meal_cob = getattr(meal, "mealCOB", 0.0) or 0.0
+    meal_carbs = getattr(meal, "carbs", 0.0) or 0.0
+
     COBforCarbsReq = max(
         0.0,
-        getattr(meal, "mealCOB", 0.0) - 0.25 * getattr(meal, "carbs", 0.0),
+        meal_cob - 0.25 * meal_carbs,
     )
 
     # safe carb ratio and CSF computation
