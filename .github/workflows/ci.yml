@@ -1,22 +1,52 @@
 name: CI
 
 on:
-  - push
-  - pull_request
+  push:
+  pull_request:
 
 jobs:
-  validate:
+  lint-test:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - name: Install project
+          python-version: "3.10"
+
+      - name: Install dependencies
         run: |
           pip install -e .
-          pip install -r requirements.txt || true
-      - name: Run validator
+          pip install pytest ruff
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Run tests
+        run: pytest -q
+
+  auto-ga-smoke:
+    runs-on: ubuntu-latest
+    needs: lint-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Run Auto-GA v3 smoke test
         run: |
-          python -m aaps_emulator.tools.validate_all
+          python - << 'EOF'
+          from aaps_emulator.optimizer.genetic_optimizer import run_optimizer
+          print("Running Auto-GA v3 smoke test...")
+          result = run_optimizer(max_generations=3, population_size=10)
+          print("OK, fitness:", result.best_fitness)
+          EOF
