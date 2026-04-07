@@ -2,6 +2,7 @@
 import shutil
 import argparse
 import subprocess
+import os
 
 from aaps_emulator.optimizer.genetic_optimizer import optimize_profile
 from aaps_emulator.runner.compare_runner import compare_logs
@@ -90,6 +91,35 @@ def run_tests(args):
 
 
 # ---------------------------------------------------------
+#  Clean (кроссплатформенная очистка)
+# ---------------------------------------------------------
+def run_clean(args=None):
+    print(f"{C.YELLOW}🧹 Cleaning project...{C.END}")
+
+    paths = [
+        "data/cache",
+        "data/reports",
+        "data/clean",
+        "__pycache__",
+        ".pytest_cache",
+    ]
+
+    for p in paths:
+        if os.path.exists(p):
+            try:
+                shutil.rmtree(p, ignore_errors=True)
+                print(f"{C.GREEN}✔ Removed {p}{C.END}")
+            except Exception as e:
+                print(f"{C.RED}❌ Failed to remove {p}: {e}{C.END}")
+
+    # recreate empty dirs
+    for p in ["data/cache", "data/reports", "data/clean"]:
+        os.makedirs(p, exist_ok=True)
+
+    print(f"{C.GREEN}✔ Clean complete.{C.END}")
+
+
+# ---------------------------------------------------------
 #  Prepare (inputs + compare + tests)
 # ---------------------------------------------------------
 def run_prepare(args):
@@ -100,6 +130,20 @@ def run_prepare(args):
     run_tests(args)
 
     print(f"{C.GREEN}✔ Project fully prepared.{C.END}")
+
+
+# ---------------------------------------------------------
+#  Fresh (clean + inputs + compare + test)
+# ---------------------------------------------------------
+def run_fresh(args):
+    print(f"{C.CYAN}🔄 Full project reset and validation...{C.END}")
+
+    run_clean()
+    run_inputs(args)
+    run_compare(args)
+    run_tests(args)
+
+    print(f"{C.GREEN}✔ Fresh run complete. Project is fully validated.{C.END}")
 
 
 # ---------------------------------------------------------
@@ -148,6 +192,18 @@ def main():
     p_prep.add_argument("--fast", action="store_true")
     p_prep.add_argument("--extract-clean", action="store_true")
     p_prep.set_defaults(func=run_prepare)
+
+    # Clean
+    p_clean = sub.add_parser("clean", help="Clean all generated files and caches")
+    p_clean.set_defaults(func=run_clean)
+
+    # Fresh
+    p_fresh = sub.add_parser("fresh", help="Clean + inputs + compare + tests")
+    p_fresh.add_argument("--logs", default="data/logs")
+    p_fresh.add_argument("--out", default="data/cache")
+    p_fresh.add_argument("--fast", action="store_true")
+    p_fresh.add_argument("--extract-clean", action="store_true")
+    p_fresh.set_defaults(func=run_fresh)
 
     args = parser.parse_args()
 

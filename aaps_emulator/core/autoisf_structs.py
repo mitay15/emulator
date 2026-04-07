@@ -345,6 +345,24 @@ class AutoIsfInputs:
     rt: Dict[str, Any] = field(default_factory=dict)
     raw_block: Any = None
 
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Универсальная сериализация AutoIsfInputs → dict.
+        Работает для вложенных dataclass и обычных dict.
+        """
+        from dataclasses import asdict, is_dataclass
+
+        def convert(obj):
+            if is_dataclass(obj):
+                return {k: convert(v) for k, v in asdict(obj).items()}
+            if isinstance(obj, list):
+                return [convert(x) for x in obj]
+            if isinstance(obj, dict):
+                return {k: convert(v) for k, v in obj.items()}
+            return obj
+
+        return convert(self)
+
 
 @dataclass
 class DosingResult:
