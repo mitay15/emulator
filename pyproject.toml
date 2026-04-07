@@ -2,7 +2,13 @@
 name = "aaps_emulator"
 version = "0.1.0"
 description = "AAPS AutoISF Python Emulator"
+readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Dimas" }
+]
+
 dependencies = [
     "numpy",
     "pandas",
@@ -10,8 +16,18 @@ dependencies = [
     "plotly",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "autoflake",
+    "black",
+    "build",
+    "twine",
+]
+
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
