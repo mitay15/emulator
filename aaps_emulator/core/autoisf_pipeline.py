@@ -253,6 +253,10 @@ def run_autoisf_pipeline(inputs: AutoIsfInputs):
     except Exception:
         pass
 
+    # ensure current_temp is never None (AAPS always provides a TempBasal object)
+    if inputs.current_temp is None:
+        inputs.current_temp = TempBasal()
+
     # determine_basal
     dosing: DosingResult = run_determine_basal(
         inputs=inputs,

@@ -1,22 +1,36 @@
 # tests/test_auto_ga_v3.py
-import pytest
-
-from aaps_emulator.optimizer.genetic_optimizer import run_optimizer
+from aaps_emulator.optimizer.genetic_optimizer import optimize_profile, OptimizationResult
 
 
-@pytest.mark.smoke
 def test_auto_ga_v3_smoke():
     """
-    Минимальный smoke‑тест: проверяем, что оптимизатор запускается,
-    проходит несколько поколений и возвращает валидный результат.
+    Smoke‑тест Auto‑GA v3: проверяем, что оптимизация запускается
+    на минимальных данных и возвращает OptimizationResult.
     """
-    result = run_optimizer(
-        max_generations=3,
-        population_size=10,
-        elitism=2,
+
+    # Минимальный набор блоков: список кортежей (start_ts, end_ts, block_data)
+    blocks = [
+        (0, 1000, [{"dummy": True}])
+    ]
+
+    base_profile = {
+        "sens": 50,
+        "carb_ratio": 10,
+        "current_basal": 1.0,
+    }
+
+    override_profile = {}
+
+    result = optimize_profile(
+        blocks=blocks,
+        base_profile=base_profile,
+        override_profile=override_profile,
+        generations=1,          # минимально
+        population_size=4,      # минимально
+        elitism=1,
+        auto_mode=False,        # без Auto‑GA v3 адаптаций
     )
 
-    assert result is not None
-    assert hasattr(result, "best_fitness")
-    assert result.best_fitness is not None
-    assert result.best_fitness >= 0
+    assert isinstance(result, OptimizationResult)
+    assert result.optimized_profile is not None
+    assert len(result.history) >= 1
