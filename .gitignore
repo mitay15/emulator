@@ -22,35 +22,46 @@ venv/
 dist/
 build/
 
-# --- Logs, dumps, debug output (only generated ones) ---
-# Не игнорируем все .log/.zip глобально — только в сгенерированных папках
-# *.log
-# *.zip
-
-# --- Generated data files (only generated folders) ---
-# Не игнорируем все .json глобально
-# *.json
-# *.csv
-# *.html
-# *.png
-
-# --- Project-specific generated folders ---
-data/reports/
-project_dump/
-debug_bundle_*/
-
-# Keep folder structure but ignore contents of generated cache
-data/cache/*
-!data/cache/.gitkeep
-
-# Если вы НЕ хотите хранить локальные логи в корне, указывайте конкретную папку.
-# Не игнорируем aaps_emulator/data/logs по умолчанию — если хотите игнорировать, раскомментируйте:
-# aaps_emulator/data/logs/*
-# !aaps_emulator/data/logs/.gitkeep
-
-# --- Tools output ---
-tree.txt
-
 # --- OS-specific ---
 .DS_Store
 Thumbs.db
+
+# --- Tools output ---
+tree.txt
+structure.txt
+
+# --- Remove accidental files ---
+get-pip.py
+
+# ============================================================
+# PROJECT-SPECIFIC IGNORE RULES
+# ============================================================
+
+# --- Ignore ALL generated data ---
+data/*
+
+# --- Keep folder structure only ---
+!data/.gitkeep
+!data/cache/.gitkeep
+!data/reports/.gitkeep
+!data/clean/.gitkeep
+!data/logs/.gitkeep
+!data/inputs_before_algo_block/.gitkeep
+
+# --- Ignore contents of all data subfolders ---
+data/cache/*
+data/reports/*
+data/clean/*
+data/logs/*
+data/inputs_before_algo_block/*
+
+# --- But keep .gitkeep inside each folder ---
+!data/cache/.gitkeep
+!data/reports/.gitkeep
+!data/clean/.gitkeep
+!data/logs/.gitkeep
+!data/inputs_before_algo_block/.gitkeep
+
+# ============================================================
+# END
+# ============================================================
