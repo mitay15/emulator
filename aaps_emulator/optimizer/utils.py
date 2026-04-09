@@ -34,10 +34,12 @@ def safe_int(x: Any, default: int = None) -> Optional[int]:
 
 def normalize_param(value: float, base: float, factor: float = 0.5) -> Tuple[float, float]:
     """
-    Возвращает диапазон для параметра:
-    base ± (base * factor)
+    Возвращает диапазон base ± base*factor.
+    Безопасно обрабатывает строки и None.
     """
-    if base is None:
+    try:
+        base = float(base)
+    except Exception:
         return (0.0, 0.0)
 
     delta = abs(base * factor)
@@ -61,13 +63,18 @@ def merge_profiles(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, 
 
 def extract_profile_params(profile: Dict[str, Any], keys: List[str]) -> Dict[str, float]:
     """
-    Извлекает только числовые параметры из профиля.
+    Извлекает числовые параметры из профиля.
+    Преобразует строки в float, пропускает None.
     """
     out = {}
     for k in keys:
         v = profile.get(k)
-        if isinstance(v, (int, float)):
+        if v is None:
+            continue
+        try:
             out[k] = float(v)
+        except Exception:
+            continue
     return out
 
 

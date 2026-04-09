@@ -4,8 +4,13 @@ import math
 
 
 def round2(x, d=2):
-    if x is None or math.isnan(x):
-        return x
+    if x is None:
+        return None
+    try:
+        if math.isnan(x):
+            return x
+    except Exception:
+        pass
     scale = 10**d
     return math.floor(x * scale + 0.5) / scale
 
@@ -89,6 +94,8 @@ def within_limits(
     if (
         high_temptarget_raises_sensitivity
         and temptargetSet
+        and target_bg is not None
+        and normalTarget is not None
         and target_bg > normalTarget
     ):
         finalISF = lift * sensitivityRatio
@@ -119,33 +126,55 @@ def compute_variable_sens(
     low_temptarget_lowers_sensitivity,
 ):
     """
-    Полный AutoISF 3.0.1 — 1:1 перенос из AAPS.
+    Полный AutoISF 3.0.1 — 1:1 перенос из AAPS (с защитой от None).
     """
 
-    sens = profile.sens
+    sens = getattr(profile, "sens", None)
 
     # -----------------------------
     # 1. SensitivityRatio (Autosens or TempTarget)
     # -----------------------------
     if (
-        high_temptarget_raises_sensitivity and isTempTarget and target_bg > normalTarget
+        high_temptarget_raises_sensitivity
+        and isTempTarget
+        and target_bg is not None
+        and normalTarget is not None
+        and target_bg > normalTarget
     ) or (
-        low_temptarget_lowers_sensitivity and isTempTarget and target_bg < normalTarget
+        low_temptarget_lowers_sensitivity
+        and isTempTarget
+        and target_bg is not None
+        and normalTarget is not None
+        and target_bg < normalTarget
     ):
-        halfBasalTarget = profile.half_basal_exercise_target
-        c = halfBasalTarget - normalTarget
-
-        if c * (c + target_bg - normalTarget) <= 0:
-            sensitivityRatio = profile.autosens_max
+        halfBasalTarget = getattr(profile, "half_basal_exercise_target", None)
+        if halfBasalTarget is None or normalTarget is None:
+            sensitivityRatio = autosens_ratio
         else:
-            sensitivityRatio = c / (c + target_bg - normalTarget)
-            sensitivityRatio = min(sensitivityRatio, profile.autosens_max)
-            sensitivityRatio = round2(sensitivityRatio, 2)
+            c = halfBasalTarget - normalTarget
+            if c * (c + target_bg - normalTarget) <= 0:
+                sensitivityRatio = getattr(profile, "autosens_max", autosens_ratio)
+            else:
+                sensitivityRatio = c / (c + target_bg - normalTarget)
+                sensitivityRatio = min(
+                    sensitivityRatio, getattr(profile, "autosens_max", sensitivityRatio)
+                )
+                sensitivityRatio = round2(sensitivityRatio, 2)
     else:
         sensitivityRatio = autosens_ratio
 
-    # Если AutoISF выключен
-    if not profile.enable_autoISF or gs is None:
+    # Если sens или sensitivityRatio невалидны — возвращаем None
+    if sens is None or sensitivityRatio in (None, 0):
+        return None
+
+    # Если AutoISF выключен или нет валидной цели/глюкозы — ведём себя как обычный Autosens
+    if (
+        not getattr(profile, "enable_autoISF", False)
+        or gs is None
+        or gs.glucose is None
+        or target_bg is None
+        or normalTarget is None
+    ):
         return round2(sens / sensitivityRatio, 1)
 
     # -----------------------------
@@ -159,7 +188,6 @@ def compute_variable_sens(
     # -----------------------------
     # 3. Parabola / Acceleration ISF
     # -----------------------------
-    # corrSqu и bgAcceleration могут быть строками → приводим к float
     try:
         fit_corr = float(gs.corrSqu)
     except Exception:
@@ -240,7 +268,7 @@ def compute_variable_sens(
     dura05 = gs.duraISFminutes
     avg05 = gs.duraISFaverage
 
-    if dura05 >= 10.0 and avg05 > target_bg:
+    if dura05 is not None and avg05 is not None and dura05 >= 10.0 and avg05 > target_bg:
         dura05Weight = dura05 / 60.0
         avg05Weight = dura_weight / target_bg
         dura_ISF = 1.0 + dura05Weight * avg05Weight * (avg05 - target_bg)

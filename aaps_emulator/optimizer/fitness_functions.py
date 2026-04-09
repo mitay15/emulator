@@ -11,6 +11,18 @@ from .utils import mae, filter_blocks_by_date
 from .autoisf_internal import compute_autoisf_internal
 from aaps_emulator.core.cache import FITNESS_CACHE
 
+def _safe_float(value, default=0.0):
+    """
+    Преобразует value в float, но если value is None или преобразование не удалось,
+    возвращает default (как float).
+    """
+    try:
+        if value is None:
+            return float(default)
+        return float(value)
+    except Exception:
+        return float(default)
+
 
 def _apply_profile_to_inputs(inputs: Any, profile: Dict[str, Any]) -> Any:
     prof_obj = getattr(inputs, "profile", None)
@@ -95,8 +107,17 @@ def evaluate_profile_fitness(
     if not filtered:
         return 999.0  # мягкий штраф
 
-    target_bg = float(profile.get("target_bg", 100.0))
-    max_smb = float(profile.get("maxSMBBasalMinutes", 30.0))
+    # Защищённые чтения ключевых числовых параметров профиля
+    target_bg = _safe_float(profile.get("target_bg"), 100.0)
+    max_smb = _safe_float(profile.get("maxSMBBasalMinutes"), 30.0)
+
+    # Дополнительные числовые поля, которые могут понадобиться в будущем
+    _ = _safe_float(profile.get("sens"), 100.0)
+    _ = _safe_float(profile.get("current_basal"), 0.0)
+    _ = _safe_float(profile.get("carb_ratio"), 10.0)
+    _ = _safe_float(profile.get("max_iob"), 0.0)
+    _ = _safe_float(profile.get("bolus_increment"), 0.1)
+    _ = _safe_float(profile.get("smb_delivery_ratio"), 0.5)
 
     eventualBG_list: List[Optional[float]] = []
     minPredBG_list: List[Optional[float]] = []
@@ -148,6 +169,7 @@ def evaluate_profile_fitness(
             internal = None
 
         if internal is not None:
+            # internal.autoISF_factor и internal.variable_sens уже числовые/None
             autoisf_factor_list.append(internal.autoISF_factor)
             var_sens_list.append(internal.variable_sens)
         else:
@@ -175,8 +197,9 @@ def evaluate_profile_fitness(
     smb_penalty = sum(min((v - max_smb) ** 2, 400) for v in smb_list if v is not None and v > max_smb)
 
     # 5) AutoISF min/max
-    autoISF_min = float(profile.get("autoISF_min", 0.7))
-    autoISF_max = float(profile.get("autoISF_max", 1.4))
+    autoISF_min = _safe_float(profile.get("autoISF_min"), 0.7)
+    autoISF_max = _safe_float(profile.get("autoISF_max"), 1.4)
+
     autoisf_penalty = 0.0
     for v in autoisf_factor_list:
         if v is None:

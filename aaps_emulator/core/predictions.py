@@ -90,15 +90,46 @@ def run_predictions(
     orig_iob_tick = iob_array[0]
 
     # -----------------------------------------------------
+    # БЕЗОПАСНЫЕ ЗНАЧЕНИЯ ПРОФИЛЯ: min_bg, max_bg, target_bg
+    # -----------------------------------------------------
+    def _safe_val(v):
+        try:
+            return None if v is None else float(v)
+        except Exception:
+            return None
+
+    p_min = _safe_val(getattr(profile, "min_bg", None))
+    p_max = _safe_val(getattr(profile, "max_bg", None))
+    p_target = _safe_val(getattr(profile, "target_bg", None))
+
+    # 1) если есть target — используем его
+    if p_target is not None:
+        target_bg = p_target
+    # 2) если есть оба min и max — среднее
+    elif p_min is not None and p_max is not None:
+        target_bg = (p_min + p_max) / 2.0
+    # 3) если есть только min или только max — используем существующее
+    elif p_min is not None:
+        target_bg = p_min
+    elif p_max is not None:
+        target_bg = p_max
+    # 4) крайний фолбэк — безопасное значение
+    else:
+        target_bg = 100.0
+
+    # Для совместимости: min_bg/max_bg должны быть числами
+    _ = p_min if p_min is not None else target_bg
+    _ = p_max if p_max is not None else target_bg
+
+    # -----------------------------------------------------
     # ПОДГОТОВКА ОСНОВНЫХ ПАРАМЕТРОВ
     # -----------------------------------------------------
-    bg = getattr(gs, "glucose", 0.0)
-    min_bg = getattr(profile, "min_bg", 0.0)
-    max_bg = getattr(profile, "max_bg", 0.0)
-    target_bg = (min_bg + max_bg) / 2.0
+    try:
+        bg = float(getattr(gs, "glucose", 0.0) or 0.0)
+    except Exception:
+        bg = 0.0
 
-    # Sensitivity (AutoISF)
-    autosens_ratio = getattr(inputs.autosens, "ratio", 1.0)
+    autosens_ratio = getattr(inputs.autosens, "ratio", 1.0) or 1.0
     base_sens = float(getattr(profile, "sens", 100.0) or 100.0)
     sens = _round(base_sens * autosens_ratio, 1)
 
@@ -112,9 +143,9 @@ def run_predictions(
     # DEVIATION
     # -----------------------------------------------------
     horizon_min = 30.0 * float(autosens_ratio or 1.0)
-    delta = getattr(gs, "delta", 0.0)
-    short = getattr(gs, "shortAvgDelta", 0.0)
-    long = getattr(gs, "longAvgDelta", 0.0)
+    delta = float(getattr(gs, "delta", 0.0) or 0.0)
+    short = float(getattr(gs, "shortAvgDelta", 0.0) or 0.0)
+    long = float(getattr(gs, "longAvgDelta", 0.0) or 0.0)
 
     deviation = _round(horizon_min / 5.0 * (min(delta, short) - bgi), 0)
     if deviation < 0:
@@ -125,7 +156,13 @@ def run_predictions(
     # -----------------------------------------------------
     # NAIVE eventual BG
     # -----------------------------------------------------
-    naive_eventualBG = _round(bg - (orig_iob_tick.iob * sens), 0)
+    # orig_iob_tick.iob может быть None
+    try:
+        orig_iob_val = float(getattr(orig_iob_tick, "iob", 0.0) or 0.0)
+    except Exception:
+        orig_iob_val = 0.0
+
+    naive_eventualBG = _round(bg - (orig_iob_val * sens), 0)
     eventualBG = naive_eventualBG + deviation
 
     # -----------------------------------------------------
@@ -136,15 +173,17 @@ def run_predictions(
     UAMpredBGs = [bg]
     ZTpredBGs = [bg]
 
-    
     # -----------------------------------------------------
     # ОСНОВНОЙ ЦИКЛ ПРЕДСКАЗАНИЙ
     # -----------------------------------------------------
     for iobTick in iob_array:
         activity = float(getattr(iobTick, "activity", 0.0) or 0.0)
-        activity_zt = float(
-            getattr(getattr(iobTick, "iobWithZeroTemp", iobTick), "activity", 0.0) or 0.0
-        )
+        # iobWithZeroTemp может быть числом или объектом с activity
+        iob_with_zt = getattr(iobTick, "iobWithZeroTemp", None)
+        if isinstance(iob_with_zt, IobTotal):
+            activity_zt = float(getattr(iob_with_zt, "activity", 0.0) or 0.0)
+        else:
+            activity_zt = float(getattr(iobTick, "activity", 0.0) or 0.0)
 
         predBGI = compute_bgi(activity, sens)
         predZTBGI = compute_bgi(activity_zt, sens)

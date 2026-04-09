@@ -54,10 +54,6 @@ def _fitness_wrapper(args):
 
 
 def _population_diversity(population: List[Dict[str, float]]) -> float:
-    """
-    Простейшая оценка разнообразия популяции:
-    среднее стандартное отклонение по параметрам.
-    """
     if not population:
         return 0.0
     keys = list(population[0].keys())
@@ -95,15 +91,25 @@ def optimize_profile(
     generations: int = 40,
     elitism: int = 2,
     auto_mode: bool = False,
+    base_mutation_rate: float = 0.2,
+    min_mutation_rate: float = 0.05,
+    max_mutation_rate: float = 0.5,
+    min_elitism: int = 1,
+    max_elitism: Optional[int] = None,
+    min_pop: Optional[int] = None,
+    max_pop: Optional[int] = None,
+    patience: int = 20,
+    min_improvement: float = 0.01,
     progress_callback: Optional[Callable[[int, float, Optional[str]], None]] = None,
 ) -> OptimizationResult:
-    """
-    Главная функция оптимизации профиля.
-    auto_mode: включает Auto‑GA v3 (адаптивные диапазоны, мутация, элитизм, размер популяции, early stopping).
-    """
     full_base_profile = merge_profiles(base_profile, override_profile)
 
     population, ranges = initial_population(full_base_profile, population_size)
+
+    print("=== RANGES ===")
+    for k, v in ranges.items():
+        print(k, v)
+    print("================")
 
     history: List[OptimizationHistoryEntry] = []
 
@@ -111,32 +117,25 @@ def optimize_profile(
     prev_best: Optional[float] = None
     no_improve_count = 0
 
-    # базовые параметры Auto‑GA
-    base_mutation_rate = 0.2
     mutation_rate = base_mutation_rate
-    min_mutation_rate = 0.05
-    max_mutation_rate = 0.5
+    if max_elitism is None:
+        max_elitism = max(3, elitism)
+    if min_pop is None:
+        min_pop = max(30, population_size // 2)
+    if max_pop is None:
+        max_pop = max(population_size, population_size * 2)
 
-    min_elitism = 1
-    max_elitism = max(3, elitism)
-
-    base_pop = population_size
-    min_pop = max(30, base_pop // 2)
-    max_pop = max(base_pop, base_pop * 2)
-
-    patience = 20
-    min_improvement = 0.01  # 1%
-
+    # основной цикл
     for gen in range(generations):
-        # --- оценка fitness ---
-        with Pool(cpu_count()) as pool:
-            fitnesses = pool.map(
-                _fitness_wrapper,
-                [
-                    (indiv, blocks, full_base_profile, start_ts, end_ts)
-                    for indiv in population
-                ],
-            )
+        # заранее формируем аргументы для пула
+        args_list = [
+            (indiv, blocks, full_base_profile, start_ts, end_ts)
+            for indiv in population
+        ]
+
+        # ускоренный multiprocessing: все ядра, maxtasksperchild, chunksize
+        with Pool(processes=cpu_count(), maxtasksperchild=200) as pool:
+            fitnesses = pool.map(_fitness_wrapper, args_list, chunksize=20)
 
         ranked = sorted(zip(population, fitnesses), key=lambda x: x[1])
         population = [p for p, f in ranked]
@@ -149,7 +148,7 @@ def optimize_profile(
 
         note: Optional[str] = None
 
-        # --- трекинг улучшения ---
+        # трекинг улучшения
         if best_overall is None or best_fit < best_overall - min_improvement:
             best_overall = best_fit
             no_improve_count = 0
@@ -159,7 +158,7 @@ def optimize_profile(
         diversity = _population_diversity(population)
 
         if auto_mode:
-            # 1) адаптивная мутация: прогресс → ослабляем, застой → усиливаем
+            # адаптивная мутация
             if prev_best is not None:
                 if best_fit < prev_best - min_improvement:
                     mutation_rate = max(min_mutation_rate, mutation_rate * 0.9)
@@ -167,22 +166,20 @@ def optimize_profile(
                     mutation_rate = min(max_mutation_rate, mutation_rate * 1.1)
             prev_best = best_fit
 
-            # 2) адаптивный элитизм: при сильном шуме/разнообразии усиливаем, при стабильности уменьшаем
-            if diversity > 0:  # есть смысл смотреть
+            # адаптивный элитизм
+            if diversity > 0:
                 if no_improve_count > patience // 2:
                     elitism = min(max_elitism, elitism + 1)
                 else:
                     elitism = max(min_elitism, elitism - 1)
 
-            # 3) адаптивный размер популяции:
-            #    если долго нет улучшения → расширяем популяцию,
-            #    если улучшение стабильное → сужаем к базовому
+            # адаптивный размер популяции
             if no_improve_count > patience // 2:
                 population_size = min(max_pop, int(population_size * 1.2))
             else:
                 population_size = max(min_pop, int(population_size * 0.9))
 
-            # 4) адаптивные диапазоны параметров
+            # адаптивные диапазоны параметров
             for param, (low, high) in list(ranges.items()):
                 if param not in best_indiv:
                     continue
@@ -213,7 +210,7 @@ def optimize_profile(
                     new_high2 = best_val + 0.5 * (high2 - best_val)
                     ranges[param] = (new_low2, new_high2)
 
-            # 5) мягкий early stopping
+            # мягкий early stopping
             if no_improve_count >= patience:
                 note = (
                     f"Auto‑GA v3: early stopping на поколении {gen} "
@@ -229,11 +226,10 @@ def optimize_profile(
                 f"pop={population_size}, div={diversity:.3f}, no_improve={no_improve_count}"
             )
 
-        # --- callback прогресса ---
         if progress_callback is not None:
             progress_callback(gen, best_fit, note)
 
-        # --- формирование нового поколения ---
+        # формирование нового поколения
         new_population: List[Dict[str, float]] = []
 
         # элитизм
@@ -253,16 +249,23 @@ def optimize_profile(
 
         population = new_population
 
-    # финальный лучший (без multiprocessing)
-    final_fitnesses = [
-        evaluate_profile_fitness(blocks, {**full_base_profile, **indiv}, start_ts, end_ts)
+    # финальная оценка — тоже параллельно
+    final_args = [
+        (indiv, blocks, full_base_profile, start_ts, end_ts)
         for indiv in population
     ]
+    with Pool(processes=cpu_count(), maxtasksperchild=200) as pool:
+        final_fitnesses = pool.map(_fitness_wrapper, final_args, chunksize=20)
+
     ranked = sorted(zip(population, final_fitnesses), key=lambda x: x[1])
     best_indiv = ranked[0][0]
 
     optimized_profile = dict(full_base_profile)
     optimized_profile.update(best_indiv)
+
+    print("=== FINAL BEST INDIV ===")
+    print(best_indiv)
+    print("========================")
 
     return OptimizationResult(
         base_profile=full_base_profile,

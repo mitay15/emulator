@@ -56,19 +56,52 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 
 def get_max_safe_basal(profile: OapsProfileAutoIsf) -> float:
     """
-    AAPS‑подобный расчёт максимального безопасного базала.
+    AAPS‑подобный расчёт максимального безопасного базала с безопасными фолбэками.
+    Возвращает число (float). Если в профиле отсутствуют значения, используются
+    разумные дефолты, чтобы избежать TypeError при умножении None.
     """
-    max_daily_basal = getattr(profile, "max_daily_basal", profile.current_basal)
-    max_basal = getattr(profile, "max_basal", profile.current_basal)
-    max_daily_safety_multiplier = getattr(profile, "max_daily_safety_multiplier", 3.0)
-    current_basal_safety_multiplier = getattr(
-        profile, "current_basal_safety_multiplier", 4.0
+    # безопасный локальный конвертер
+    def _safe(v, default: float):
+        try:
+            if v is None:
+                return float(default)
+            return float(v)
+        except Exception:
+            return float(default)
+
+    # Берём значения с фолбэками
+    current_basal = _safe(getattr(profile, "current_basal", None), 0.0)
+    max_basal = _safe(getattr(profile, "max_basal", None), current_basal)
+    max_daily_basal = _safe(getattr(profile, "max_daily_basal", None), current_basal)
+    max_daily_safety_multiplier = _safe(
+        getattr(profile, "max_daily_safety_multiplier", None), 3.0
     )
-    return min(
-        max_basal,
-        max_daily_basal * max_daily_safety_multiplier,
-        profile.current_basal * current_basal_safety_multiplier,
+    current_basal_safety_multiplier = _safe(
+        getattr(profile, "current_basal_safety_multiplier", None), 4.0
     )
+
+    # Рассчитываем безопасные варианты и возвращаем минимум
+    try:
+        candidate1 = float(max_basal)
+    except Exception:
+        candidate1 = current_basal
+
+    try:
+        candidate2 = float(max_daily_basal) * float(max_daily_safety_multiplier)
+    except Exception:
+        candidate2 = current_basal * float(max_daily_safety_multiplier)
+
+    try:
+        candidate3 = float(current_basal) * float(current_basal_safety_multiplier)
+    except Exception:
+        candidate3 = current_basal * float(current_basal_safety_multiplier)
+
+    # Если current_basal == 0 (нет данных) — вернём разумный положительный дефолт
+    if current_basal <= 0.0:
+        # дефолтный безопасный базал (например 1.0 U/h) — можно настроить
+        return max(1.0, candidate1, candidate2, candidate3)
+
+    return min(candidate1, candidate2, candidate3)
 
 
 def set_temp_basal(
@@ -177,7 +210,7 @@ def determine_basal_autoisf(
 
     enableSMB = bool(getattr(profile, "enableSMB", False))
     smb_ratio = _safe_float(getattr(profile, "smb_delivery_ratio", 1.0), 1.0)
-    iob_threshold_percent = _safe_float(
+    _ = _safe_float(
         getattr(profile, "iob_threshold_percent", 30), 30.0
     )
 
@@ -185,6 +218,17 @@ def determine_basal_autoisf(
         return res
 
     bg = _safe_float(getattr(glucose_status, "glucose", 0.0), 0.0)
+
+    # --- безопасные локальные значения профиля (фолбэки) ---
+    _profile_val = profile or None
+    safe_current_basal = _safe_float(getattr(_profile_val, "current_basal", None), 0.0)
+    safe_min_bg = _safe_float(getattr(_profile_val, "min_bg", None), 70.0)
+    safe_max_bg = _safe_float(getattr(_profile_val, "max_bg", None), 120.0)
+    safe_target_bg = _safe_float(getattr(_profile_val, "target_bg", None), (safe_min_bg + safe_max_bg) / 2.0)
+    _ = _safe_float(getattr(_profile_val, "sens", None), 100.0)
+    _ = _safe_float(getattr(_profile_val, "max_iob", None), 0.0)
+    safe_carb_ratio = _safe_float(getattr(_profile_val, "carb_ratio", None), 1.0)
+    safe_smb_delivery_ratio = _safe_float(getattr(_profile_val, "smb_delivery_ratio", None), 0.5)
 
     # deltas from glucose_status or debug fallback
     delta = getattr(glucose_status, "delta", None)
@@ -198,15 +242,10 @@ def determine_basal_autoisf(
     if longAvgDelta is None:
         longAvgDelta = _safe_float(debug.get("longAvgDelta", 0.0), 0.0)
 
-    min_bg = _safe_float(getattr(profile, "min_bg", 0.0), 0.0)
-    max_bg = _safe_float(getattr(profile, "max_bg", 0.0), 0.0)
-
-    # profile.target_bg может быть None — используем fallback (среднее min/max)
-    _tg = getattr(profile, "target_bg", None)
-    if _tg is None:
-        target_bg = (min_bg + max_bg) / 2.0
-    else:
-        target_bg = _safe_float(_tg, (min_bg + max_bg) / 2.0)
+    # Используем заранее вычисленные безопасные значения
+    min_bg = safe_min_bg      # noqa: F841
+    max_bg = safe_max_bg      # noqa: F841
+    target_bg = safe_target_bg  # noqa: F841
 
     # --- safe sens selection: prefer positive variable_sens, fallback to profile.sens ---
     _vs = getattr(profile, "variable_sens", None)
@@ -270,9 +309,20 @@ def determine_basal_autoisf(
     if maxDelta > 0.20 * bg:
         enableSMB = False
 
+    # безопасный zero-temp расчёт: приводим current_basal и sens к числам
     zeroTempDuration = minutesAboveThreshold
-    sens_val = sens if sens and sens > 0 else getattr(profile, "sens", 1.0) or 1.0
-    zeroTempEffectDouble = profile.current_basal * sens_val * zeroTempDuration / 60.0
+
+    # безопасный sens_val: prefer sens (если >0) -> profile.sens -> 1.0
+    try:
+        sens_val = float(sens) if (sens is not None and float(sens) > 0) else float(getattr(profile, "sens", 1.0) or 1.0)
+    except Exception:
+        sens_val = float(getattr(profile, "sens", 1.0) or 1.0)
+
+    # безопасный current_basal (фолбэк 0.0)
+    current_basal_val = safe_current_basal
+
+    # zeroTempEffectDouble теперь не упадёт, даже если current_basal отсутствует
+    zeroTempEffectDouble = current_basal_val * sens_val * (zeroTempDuration / 60.0)
 
     meal_cob = getattr(meal, "mealCOB", 0.0) or 0.0
     meal_carbs = getattr(meal, "carbs", 0.0) or 0.0
@@ -283,9 +333,9 @@ def determine_basal_autoisf(
     )
 
     # safe carb ratio and CSF computation
-    carb_ratio = getattr(profile, "carb_ratio", None) or 1.0
+    carb_ratio_f = safe_carb_ratio or 1.0
     try:
-        carb_ratio_f = float(carb_ratio)
+        carb_ratio_f = float(carb_ratio_f)
     except Exception:
         carb_ratio_f = 1.0
 
@@ -303,7 +353,7 @@ def determine_basal_autoisf(
     carbsReq = max(0, carbsReq)
 
     if (
-        carbsReq >= int(getattr(profile, "carbsReqThreshold", 1))
+        carbsReq >= int(_safe_float(getattr(profile, "carbsReqThreshold", 1), 1))
         and minutesAboveThreshold <= 45
     ):
         res.carbsReq = int(carbsReq)
@@ -389,7 +439,7 @@ def determine_basal_autoisf(
     # --- AAPS safety cap: limit by maxSafeBasal ---
     maxSafeBasal = get_max_safe_basal(profile)
     if rate > maxSafeBasal:
-        rate = maxSafeBasal
+        rate = round_basal(maxSafeBasal)
 
     insulinScheduled = (
         (currenttemp.duration or 0) * ((currenttemp.rate or basal) - basal) / 60.0
@@ -421,14 +471,14 @@ def determine_basal_autoisf(
     SMBInterval = min(10, max(1, int(getattr(profile, "SMBInterval", 5)))) * 60.0
 
     # --- AAPS: compute iobTHvirtual (IOB threshold) ---
-    iob_threshold_percent = getattr(profile, "iob_threshold_percent", 100)
+    iob_threshold_percent_val = _safe_float(getattr(profile, "iob_threshold_percent", None), 100.0)
     iobTHtolerance = 130.0
-    iobTHvirtual = (
-        iob_threshold_percent * iobTHtolerance / 10000.0
-    ) * getattr(profile, "max_iob", 0.0)
+    max_iob_val = _safe_float(getattr(profile, "max_iob", None), 0.0)
+
+    iobTHvirtual = (iob_threshold_percent_val * iobTHtolerance / 10000.0) * max_iob_val
 
     # --- AAPS 3.4 SMB LOGIC (первый блок, оставлен как есть) ---
-    if getattr(profile, "max_iob", 0.0) <= 0:
+    if max_iob_val <= 0:
         enableSMB = False
 
     if iob_data.iob > iobTHvirtual:
@@ -444,32 +494,28 @@ def determine_basal_autoisf(
         mealInsulinReq = (
             round_val(
                 getattr(meal, "mealCOB", 0.0)
-                / (getattr(profile, "carb_ratio", 1.0) or 1.0),
+                / (safe_carb_ratio or 1.0),
                 3,
             )
             if getattr(profile, "carb_ratio", None)
             else 0.0
         )
 
-        smb_max_range = getattr(profile, "smb_delivery_ratio", 0.5)
+        smb_max_range = safe_smb_delivery_ratio
 
         if iob_data.iob > mealInsulinReq and iob_data.iob > 0:
             maxBolus = round_val(
                 smb_max_range
-                * profile.current_basal
-                * getattr(
-                    profile,
-                    "maxUAMSMBBasalMinutes",
-                    getattr(profile, "maxSMBBasalMinutes", 30),
-                )
+                * safe_current_basal
+                * _safe_float(getattr(profile, "maxUAMSMBBasalMinutes", getattr(profile, "maxSMBBasalMinutes", 30)), 30.0)
                 / 60.0,
                 1,
             )
         else:
             maxBolus = round_val(
                 smb_max_range
-                * profile.current_basal
-                * getattr(profile, "maxSMBBasalMinutes", 30)
+                * safe_current_basal
+                * _safe_float(getattr(profile, "maxSMBBasalMinutes", 30), 30.0)
                 / 60.0,
                 1,
             )
@@ -481,7 +527,7 @@ def determine_basal_autoisf(
 
         microBolus = min(insulinReq / 2.0, maxBolus)
 
-        smb_ratio = getattr(profile, "smb_delivery_ratio", 0.5)
+        smb_ratio = safe_smb_delivery_ratio
         microBolus = min(insulinReq * smb_ratio, maxBolus)
 
         if microBolus > iobTHvirtual - iob_data.iob:
@@ -499,7 +545,7 @@ def determine_basal_autoisf(
             return res
 
     # --- AAPS: второй блок SMB (оставлен для 1:1 совместимости) ---
-    if getattr(profile, "max_iob", 0.0) <= 0:
+    if max_iob_val <= 0:
         enableSMB = False
 
     if iob_data.iob > iobTHvirtual:
@@ -509,32 +555,28 @@ def determine_basal_autoisf(
         mealInsulinReq = (
             round_val(
                 getattr(meal, "mealCOB", 0.0)
-                / (getattr(profile, "carb_ratio", 1.0) or 1.0),
+                / (safe_carb_ratio or 1.0),
                 3,
             )
             if getattr(profile, "carb_ratio", None)
             else 0.0
         )
 
-        smb_max_range = getattr(profile, "smb_delivery_ratio", 0.5)
+        smb_max_range = safe_smb_delivery_ratio
 
         if iob_data.iob > mealInsulinReq and iob_data.iob > 0:
             maxBolus = round_val(
                 smb_max_range
-                * profile.current_basal
-                * getattr(
-                    profile,
-                    "maxUAMSMBBasalMinutes",
-                    getattr(profile, "maxSMBBasalMinutes", 30),
-                )
+                * safe_current_basal
+                * _safe_float(getattr(profile, "maxUAMSMBBasalMinutes", getattr(profile, "maxSMBBasalMinutes", 30)), 30.0)
                 / 60.0,
                 1,
             )
         else:
             maxBolus = round_val(
                 smb_max_range
-                * profile.current_basal
-                * getattr(profile, "maxSMBBasalMinutes", 30)
+                * safe_current_basal
+                * _safe_float(getattr(profile, "maxSMBBasalMinutes", 30), 30.0)
                 / 60.0,
                 1,
             )
@@ -547,7 +589,7 @@ def determine_basal_autoisf(
         microBolus = min(insulinReq / 2.0, maxBolus)
         microBolus = int(microBolus * roundSMBTo) / float(roundSMBTo)
 
-        smb_ratio = getattr(profile, "smb_delivery_ratio", 0.5)
+        smb_ratio = safe_smb_delivery_ratio
         if getattr(profile, "autoISF_version", None) is not None:
             microBolus = min(insulinReq * smb_ratio, maxBolus)
             if microBolus > iobTHvirtual - iob_data.iob:

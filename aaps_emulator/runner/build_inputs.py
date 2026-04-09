@@ -1,4 +1,3 @@
-# aaps_emulator/runner/build_inputs.py
 from __future__ import annotations
 
 import json
@@ -6,9 +5,8 @@ import logging
 import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
 from aaps_emulator.runner.load_logs import load_logs
-
-
 from aaps_emulator.core.autoisf_structs import (
     AutoIsfInputs,
     AutosensResult,
@@ -22,6 +20,9 @@ from aaps_emulator.core.autoisf_structs import (
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------
+#  Safe converters
+# ---------------------------------------------------------
 def _safe_float(v: Any) -> Optional[float]:
     try:
         if v is None:
@@ -46,6 +47,9 @@ def _safe_int(v: Any) -> Optional[int]:
         return None
 
 
+# ---------------------------------------------------------
+#  Helpers
+# ---------------------------------------------------------
 def _find_first(block: List[Dict[str, Any]], type_name: str) -> Dict[str, Any]:
     return next(
         (o for o in block if isinstance(o, dict) and o.get("__type__") == type_name),
@@ -53,6 +57,9 @@ def _find_first(block: List[Dict[str, Any]], type_name: str) -> Dict[str, Any]:
     )
 
 
+# ---------------------------------------------------------
+#  Converters
+# ---------------------------------------------------------
 def _to_glucose_status(obj: Dict[str, Any]) -> GlucoseStatusAutoIsf:
     if not obj:
         return GlucoseStatusAutoIsf()
@@ -118,24 +125,52 @@ def _to_iob(od: Dict[str, Any]) -> IobTotal:
         return IobTotal()
 
 
+# ---------------------------------------------------------
+#  Profile converter (AAPS 3.4 strict)
+# ---------------------------------------------------------
+def _convert_profile_units_if_needed(d: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Если профиль в mmol/L — конвертируем в mg/dL.
+    """
+    if not d:
+        return d
+
+    units = d.get("out_units")
+    if units and isinstance(units, str) and units.lower() == "mmol/l":
+        for key in ("min_bg", "max_bg", "target_bg", "sens"):
+            if key in d and d[key] is not None:
+                try:
+                    d[key] = float(d[key]) * 18.0
+                except Exception:
+                    pass
+
+    return d
+
+
 def _to_profile(d: Dict[str, Any]) -> OapsProfileAutoIsf:
     if not d:
         return OapsProfileAutoIsf()
+
     try:
-        d2 = dict(d)
-        for k in ("min_bg", "max_bg", "sens", "variable_sens", "current_basal", "max_iob", "lgsThreshold"):
-            if k in d2:
-                val = _safe_float(d2.get(k))
-                if k == "lgsThreshold":
-                    d2[k] = val
-                else:
-                    d2[k] = val if val is not None else d2.get(k)
-        return OapsProfileAutoIsf(**d2)
+        d = _convert_profile_units_if_needed(dict(d))
+
+        # convert numeric-like fields to float where возможно
+        for k, v in list(d.items()):
+            if isinstance(v, (int, float, str)):
+                fv = _safe_float(v)
+                if fv is not None:
+                    d[k] = fv
+
+        return OapsProfileAutoIsf(**d)
+
     except Exception:
         logger.exception("Failed to convert profile object")
         return OapsProfileAutoIsf()
 
 
+# ---------------------------------------------------------
+#  Autosens / Meal
+# ---------------------------------------------------------
 def _to_autosens(d: Dict[str, Any]) -> AutosensResult:
     if not d:
         return AutosensResult()
@@ -163,6 +198,9 @@ def _to_meal(d: Dict[str, Any]) -> MealData:
         return MealData()
 
 
+# ---------------------------------------------------------
+#  variable_sens propagation
+# ---------------------------------------------------------
 def _propagate_variable_sens_from_rt(rt_obj: Dict[str, Any], profile, autosens):
     if not isinstance(rt_obj, dict):
         return
@@ -172,22 +210,19 @@ def _propagate_variable_sens_from_rt(rt_obj: Dict[str, Any], profile, autosens):
     try:
         if profile is not None:
             profile.variable_sens = vs_rt
-            setattr(profile, "_variable_sens_from_rt", True)
     except Exception:
         pass
     try:
         if autosens is not None:
             autosens.ratio = vs_rt
-            setattr(autosens, "_variable_sens_from_rt", True)
     except Exception:
         pass
 
 
+# ---------------------------------------------------------
+#  Build block
+# ---------------------------------------------------------
 def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
-    """
-    Преобразует список объектов AutoISF-блока из логов AAPS
-    в корректный AutoIsfInputs (core.autoisf_structs).
-    """
     try:
         gs_obj = _find_first(block, "GlucoseStatusAutoIsf")
         ct_obj = _find_first(block, "CurrentTemp")
@@ -196,55 +231,47 @@ def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
         algorithm = rt_obj.get("algorithm") if isinstance(rt_obj, dict) else None
         algo_marker = {"algorithm": algorithm}
 
-        profile_obj = (
-            rt_obj.get("profile") if isinstance(rt_obj, dict) else None
-        ) or _find_first(block, "OapsProfileAutoIsf")
+        profile_obj = None
+        if isinstance(rt_obj, dict):
+            profile_obj = (
+                rt_obj.get("profile")
+                or rt_obj.get("currentProfile")
+                or rt_obj.get("oapsProfile")
+                or (rt_obj.get("autosensData") or {}).get("profile")
+            )
+        if not profile_obj:
+            profile_obj = _find_first(block, "OapsProfileAutoIsf")
 
-        autosens_obj = (
-            rt_obj.get("autosens") if isinstance(rt_obj, dict) else None
-        ) or _find_first(block, "AutosensResult")
+        autosens_obj = None
+        if isinstance(rt_obj, dict):
+            autosens_obj = (
+                rt_obj.get("autosens")
+                or (rt_obj.get("autosensData") or {}).get("autosens")
+            )
+        if not autosens_obj:
+            autosens_obj = _find_first(block, "AutosensResult")
 
-        meal_obj = (
-            rt_obj.get("mealData") if isinstance(rt_obj, dict) else None
-        ) or _find_first(block, "MealData")
+        meal_obj = None
+        if isinstance(rt_obj, dict):
+            meal_obj = rt_obj.get("mealData")
+        if not meal_obj:
+            meal_obj = _find_first(block, "MealData")
 
         iob_objs = [
             o for o in block if isinstance(o, dict) and o.get("__type__") == "IobTotal"
         ]
 
-        try:
-            gs = _to_glucose_status(gs_obj)
-        except Exception:
-            gs = None
-
-        try:
-            ct = _to_current_temp(ct_obj)
-        except Exception:
-            ct = None
-
-        try:
-            profile = _to_profile(profile_obj)
-        except Exception:
-            profile = None
-
-        try:
-            autosens = _to_autosens(autosens_obj)
-        except Exception:
-            autosens = None
+        gs = _to_glucose_status(gs_obj)
+        ct = _to_current_temp(ct_obj)
+        profile = _to_profile(profile_obj)
+        autosens = _to_autosens(autosens_obj)
+        meal = _to_meal(meal_obj)
 
         _propagate_variable_sens_from_rt(rt_obj, profile, autosens)
 
-        try:
-            meal = _to_meal(meal_obj)
-        except Exception:
-            meal = None
-
         iob_array: List[IobTotal] = []
         for o in iob_objs:
-            try:
-                iob_array.append(_to_iob(o))
-            except Exception:
-                continue
+            iob_array.append(_to_iob(o))
 
         return AutoIsfInputs(
             glucose_status=gs,
@@ -278,30 +305,62 @@ def build_inputs_from_block(block: List[Dict[str, Any]]) -> AutoIsfInputs:
             logger.exception("Failed to write error dump for build_inputs")
         raise
 
+
 # ---------------------------------------------------------
-#  Генерация inputs_before_algo_block_* из логов AAPS
+#  Extract profileJson from APSResult lines
 # ---------------------------------------------------------
+def _extract_profile_from_text(parsed: List[Any]) -> Optional[Dict[str, Any]]:
+    """
+    Ищет строки вида:
+    profileJson={...}
+    и извлекает JSON-профиль.
+    """
+    for line in parsed:
+        if not isinstance(line, str):
+            continue
+        if "profileJson={" not in line:
+            continue
+
+        try:
+            text = line.split("profileJson=", 1)[1].strip()
+            if not text.startswith("{"):
+                continue
+
+            depth = 0
+            end = 0
+            for i, ch in enumerate(text):
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        break
+
+            json_block = text[:end]
+            return json.loads(json_block)
+
+        except Exception:
+            continue
+
+    return None
 
 
+# ---------------------------------------------------------
+#  Build inputs from logs
+# ---------------------------------------------------------
 def build_inputs_from_logs(
     logs_dir: str = "data/logs",
-    out_dir: str = "data/cache"
+    out_dir: str = "data/cache",
 ):
-    """
-    Загружает логи AAPS, выделяет AutoISF-блоки и сохраняет
-    inputs_before_algo_block_*.json в data/cache/.
-    Логика выделения блоков полностью совпадает с compare_runner.
-    """
-
     logs_path = Path(logs_dir)
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    # Ищем .json, .log, .zip
     files = sorted(
-        list(logs_path.rglob("*.json")) +
-        list(logs_path.rglob("*.log")) +
-        list(logs_path.rglob("*.zip"))
+        list(logs_path.rglob("*.json"))
+        + list(logs_path.rglob("*.log"))
+        + list(logs_path.rglob("*.zip"))
     )
 
     if not files:
@@ -318,8 +377,12 @@ def build_inputs_from_logs(
             print(f"❌ Ошибка чтения {f}: {e}")
             continue
 
-        # --- ЛОГИКА ВЫДЕЛЕНИЯ БЛОКОВ (как в compare_runner) ---
-        blocks = []
+        # 1. Профиль из APSResult (profileJson={...})
+        profile_json = _extract_profile_from_text(parsed)
+        global_profile = _to_profile(profile_json) if profile_json else OapsProfileAutoIsf()
+
+        # 2. Выделяем AutoISF-блоки
+        blocks: List[List[Dict[str, Any]]] = []
         i = 0
         n = len(parsed)
 
@@ -340,10 +403,14 @@ def build_inputs_from_logs(
 
         print(f"  → найдено {len(blocks)} AutoISF-блоков")
 
-        # --- СОХРАНЕНИЕ ---
+        # 3. Сохраняем блоки
         for block in blocks:
             try:
                 inputs = build_inputs_from_block(block)
+
+                # Вставляем глобальный профиль (из APSResult)
+                inputs.profile = global_profile
+
                 out_file = out_path / f"inputs_before_algo_block_{counter:05d}.json"
                 with out_file.open("w", encoding="utf-8") as fp:
                     json.dump(inputs.to_dict(), fp, ensure_ascii=False, indent=2)

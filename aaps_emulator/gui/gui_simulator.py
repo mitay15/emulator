@@ -1,4 +1,5 @@
 # aaps_emulator/gui/gui_simulator.py
+
 from __future__ import annotations
 
 import json
@@ -42,6 +43,43 @@ def load_inputs_before(ts: int):
         return None
 
 
+def load_real_profile_from_cache() -> Dict[str, Any]:
+    """
+    Ищем реальный профиль в raw_block (тип OapsProfileAutoIsf),
+    а не пустую заглушку в profile.
+    """
+    for p in sorted(CACHE_DIR.glob("inputs_before_algo_block_*.json")):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                d = json.load(f)
+        except Exception:
+            continue
+
+        # 1) Ищем в raw_block объект OapsProfileAutoIsf
+        raw_block = d.get("raw_block")
+        if isinstance(raw_block, list):
+            for item in raw_block:
+                if isinstance(item, dict) and item.get("__type__") == "OapsProfileAutoIsf":
+                    st.write(f"Found REAL profile in raw_block: {p.name}")
+                    return item
+
+        # 2) fallback: inputs.profile
+        prof2 = d.get("inputs", {}).get("profile")
+        if isinstance(prof2, dict):
+            if any(v not in (None, {}, []) for v in prof2.values()):
+                st.write(f"Found usable inputs.profile in: {p.name}")
+                return prof2
+
+        # 3) fallback: корневой profile
+        prof = d.get("profile")
+        if isinstance(prof, dict):
+            if any(v not in (None, {}, []) for v in prof.values()):
+                st.write(f"Found usable profile in: {p.name}")
+                return prof
+
+    return {}
+
+
 # ============================================================
 # MAIN GUI
 # ============================================================
@@ -52,20 +90,20 @@ def main():
     # LOAD BLOCKS
     # -----------------------------
     blocks = load_and_group_blocks(LOGS_DIR)
+    if not blocks:
+        st.error("No blocks found in data/logs. Check that logs exist.")
+        return
 
     # -----------------------------
-    # EXTRACT INITIAL PROFILE
+    # EXTRACT INITIAL PROFILE (REAL)
     # -----------------------------
-    initial_profile: Dict[str, Any] = {}
-    for idx, ts, block_objs in blocks:
-        inputs_before = load_inputs_before(ts)
-        if not inputs_before or not isinstance(inputs_before, dict):
-            continue
-        inner = inputs_before.get("inputs") or {}
-        prof_dict = inner.get("profile")
-        if prof_dict:
-            initial_profile = prof_dict
-            break
+    initial_profile: Dict[str, Any] = load_real_profile_from_cache()
+    if not initial_profile:
+        st.error("No initial profile found in cache inputs. Check data/cache files.")
+        return
+
+    st.markdown("### Initial profile (keys sample)")
+    st.write(list(initial_profile.keys())[:40])
 
     # -----------------------------
     # DATE RANGE SELECTION
@@ -135,9 +173,9 @@ def main():
             except Exception:
                 profile_override[k] = v
 
-    # ============================================================
+    # -----------------------------
     # OPTIMIZATION TAB
-    # ============================================================
+    # -----------------------------
     (tab_opt,) = st.tabs(["Optimization"])
 
     with tab_opt:
@@ -153,8 +191,8 @@ def main():
             index=0,
         )
 
-        population_size = st.slider("Размер популяции", 20, 200, 80, 10)
-        generations = st.slider("Количество поколений", 10, 200, 60, 10)
+        population_size = st.slider("Размер популяции", 20, 400, 80, 10)
+        generations = st.slider("Количество поколений", 10, 1000, 60, 10)
         elitism = st.slider("Элитизм", 1, 10, 2)
 
         if preset == "Conservative":
@@ -167,8 +205,50 @@ def main():
             population_size = 120
             generations = 40
 
+        with st.expander("Advanced GA settings", expanded=False):
+            st.write("Тонкая настройка Auto‑GA (опционально)")
+
+            base_mutation_rate = st.slider("Base mutation rate", 0.01, 1.0, 0.30, 0.01)
+            min_mutation_rate = st.slider("Min mutation rate", 0.0, 0.5, 0.05, 0.01)
+            max_mutation_rate = st.slider("Max mutation rate", 0.1, 1.0, 0.6, 0.01)
+
+            patience = st.number_input(
+                "Early stop patience (поколений)",
+                min_value=1,
+                max_value=500,
+                value=50,
+                step=1,
+            )
+            min_improvement = st.number_input(
+                "Min improvement (fraction)",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.01,
+                step=0.001,
+                format="%.3f",
+            )
+
+            min_elitism = st.number_input("Min elitism", min_value=1, max_value=10, value=1, step=1)
+            max_elitism = st.number_input("Max elitism", min_value=1, max_value=20, value=5, step=1)
+
+            min_pop = st.number_input(
+                "Min population",
+                min_value=10,
+                max_value=1000,
+                value=max(30, population_size // 2),
+                step=1,
+            )
+            max_pop = st.number_input(
+                "Max population",
+                min_value=10,
+                max_value=5000,
+                value=max(population_size, population_size * 3),
+                step=1,
+            )
+
         st.write(
-            f"Параметры: популяция = {population_size}, поколения = {generations}, элитизм = {elitism}, Auto‑GA = {auto_ga}"
+            f"Параметры: популяция = {population_size}, поколения = {generations}, "
+            f"элитизм = {elitism}, Auto‑GA = {auto_ga}"
         )
 
         progress_placeholder = st.empty()
@@ -189,10 +269,19 @@ def main():
                     override_profile=profile_override,
                     start_ts=start_ts,
                     end_ts=end_ts,
-                    population_size=population_size,
-                    generations=generations,
-                    elitism=elitism,
-                    auto_mode=auto_ga,
+                    population_size=int(population_size),
+                    generations=int(generations),
+                    elitism=int(elitism),
+                    auto_mode=bool(auto_ga),
+                    base_mutation_rate=float(base_mutation_rate),
+                    min_mutation_rate=float(min_mutation_rate),
+                    max_mutation_rate=float(max_mutation_rate),
+                    min_elitism=int(min_elitism),
+                    max_elitism=int(max_elitism),
+                    min_pop=int(min_pop),
+                    max_pop=int(max_pop),
+                    patience=int(patience),
+                    min_improvement=float(min_improvement),
                     progress_callback=update_progress,
                 )
 
